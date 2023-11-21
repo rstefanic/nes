@@ -139,10 +139,13 @@ fn execute(self: *Cpu, ins: Instruction) !void {
             operand = try self.bus.read(address);
         },
         .IndirectIndexed => {
+            // The operand is a zero-page address to a pointer. Y is added to
+            // the pointer to mimic indexing giving us the effective address.
             const byte = try self.fetch();
-            const address = makeWord(0x00, byte);
-            operand = try self.bus.read(address);
-            operand.? += self.y;
+            const lo = try self.bus.read(makeWord(0x00, byte));
+            const hi = try self.bus.read(makeWord(0x00, byte + 1));
+            const effective_address = makeWord(hi, lo) + self.y;
+            operand = try self.bus.read(effective_address);
         },
     }
 
@@ -327,6 +330,24 @@ test "LDA Absolute,Y" {
     try bus.write(0x0002, 0xFF); // Operand high byte
     try bus.write(0xFF08, 0xFF);
     cpu.y = 2; // Y index to be added to get the effective address
+    try cpu.step();
+
+    try testing.expectEqual(expected_byte, cpu.a);
+}
+
+test "LDA IndirectIndexed" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0xFF;
+
+    try bus.write(0x0000, 0xB1); // LDA IndirectIndexed Instruction
+    try bus.write(0x0001, 0x70); // Operand
+
+    // Contents at 0x0070 which contains the effective address
+    try bus.write(0x0070, 0x43); // Low Byte
+    try bus.write(0x0071, 0x35); // High Byte
+    try bus.write(0x3553, expected_byte);
+    cpu.y = 0x10; // Y value to be added to the effective address
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.a);
