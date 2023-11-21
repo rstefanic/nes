@@ -247,6 +247,61 @@ test "CLI" {
     try testing.expectEqual(cpu.status.interrupt_disable, false);
 }
 
+test "LDA Immediate" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0xFF;
+
+    try bus.write(0x0000, 0xA9); // LDA Instruction
+    try bus.write(0x0001, expected_byte); // Operand
+    try cpu.step();
+
+    try testing.expectEqual(expected_byte, cpu.a);
+    // The zero flag should be clear when setting the A register to 0xFF
+    try testing.expectEqual(false, cpu.status.zero_result);
+}
+
+test "LDA ZeroPage" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0xFF;
+
+    try bus.write(0x0000, 0xA5); // LDA ZeroPage Instruction
+    try bus.write(0x0001, 0x06); // Operand
+    try bus.write(0x0006, expected_byte);
+    try cpu.step();
+
+    try testing.expectEqual(expected_byte, cpu.a);
+}
+
+test "LDA ZeroPage,X" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0xFF;
+
+    try bus.write(0x0000, 0xB5); // LDA ZeroPage,X Instruction
+    try bus.write(0x0001, 0x06); // Operand
+    try bus.write(0x0007, expected_byte);
+    cpu.x = 1; // X offset
+    try cpu.step();
+
+    try testing.expectEqual(expected_byte, cpu.a);
+}
+
+test "LDA Absolute" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0xFF;
+
+    try bus.write(0x0000, 0xAD); // LDA Absolute Instruction
+    try bus.write(0x0001, 0x06); // Operand low byte
+    try bus.write(0x0002, 0xFF); // Operand high byte
+    try bus.write(0xFF06, expected_byte);
+    try cpu.step();
+
+    try testing.expectEqual(expected_byte, cpu.a);
+}
+
 test "LDA Absolute,X" {
     var bus = Bus{};
     var cpu = Cpu.init(&bus);
