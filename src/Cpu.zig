@@ -95,6 +95,18 @@ fn execute(self: *Cpu, ins: Instruction) !void {
             const address = makeWord(hi, lo);
             operand = try self.bus.read(address);
         },
+        .AbsoluteX => {
+            const lo = try self.fetch();
+            const hi = try self.fetch();
+            const address = makeWord(hi, lo);
+            operand = try self.bus.read(address + self.x);
+        },
+        .AbsoluteY => {
+            const lo = try self.fetch();
+            const hi = try self.fetch();
+            const address = makeWord(hi, lo);
+            operand = try self.bus.read(address + self.y);
+        },
         .ZeroPage => {
             const lo = try self.fetch();
             const address = makeWord(0x00, lo);
@@ -113,20 +125,6 @@ fn execute(self: *Cpu, ins: Instruction) !void {
             // and always remain on the Zero Page.
             const address = (byte + self.y) % 255;
             operand = try self.bus.read(address);
-        },
-        .AbsoluteX => {
-            const lo = try self.fetch();
-            const hi = try self.fetch();
-            const address = makeWord(hi, lo);
-            operand = try self.bus.read(address);
-            operand.? += self.x;
-        },
-        .AbsoluteY => {
-            const lo = try self.fetch();
-            const hi = try self.fetch();
-            const address = makeWord(hi, lo);
-            operand = try self.bus.read(address);
-            operand.? += self.y;
         },
         .Indirect => {
             const lo = try self.fetch();
@@ -247,4 +245,34 @@ test "CLI" {
     try cpu.step();
 
     try testing.expectEqual(cpu.status.interrupt_disable, false);
+}
+
+test "LDA Absolute,X" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0xFF;
+
+    try bus.write(0x0000, 0xBD); // LDA Absolute,X Instruction
+    try bus.write(0x0001, 0x06); // Operand low byte
+    try bus.write(0x0002, 0xFF); // Operand high byte
+    try bus.write(0xFF07, 0xFF);
+    cpu.x = 1; // X index to be added to get the effective address
+    try cpu.step();
+
+    try testing.expectEqual(expected_byte, cpu.a);
+}
+
+test "LDA Absolute,Y" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0xFF;
+
+    try bus.write(0x0000, 0xB9); // LDA Absolute,Y Instruction
+    try bus.write(0x0001, 0x06); // Operand low byte
+    try bus.write(0x0002, 0xFF); // Operand high byte
+    try bus.write(0xFF08, 0xFF);
+    cpu.y = 2; // Y index to be added to get the effective address
+    try cpu.step();
+
+    try testing.expectEqual(expected_byte, cpu.a);
 }
