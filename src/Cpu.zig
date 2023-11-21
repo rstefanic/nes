@@ -46,7 +46,7 @@ pub fn init(bus: *Bus) Cpu {
 }
 
 inline fn makeWord(hi_byte: u8, lo_byte: u8) u16 {
-    return (@as(u16, hi_byte) << 1) + lo_byte;
+    return (@as(u16, hi_byte) << 8) + lo_byte;
 }
 
 pub fn step(self: *Cpu) !void {
