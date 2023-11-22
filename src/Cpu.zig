@@ -134,9 +134,14 @@ fn execute(self: *Cpu, ins: Instruction) !void {
             operand = try self.bus.read(address);
         },
         .IndexedIndirect => {
-            const byte = try self.fetch();
-            const address = makeWord(0x00, byte + self.x);
-            operand = try self.bus.read(address);
+            // The operand + X is a lookup address on the zero-page. This address contains the
+            // 16 bit effective address. This lookup address should never overflow onto the
+            // next page, so we'll mod the result by 0xFF to stay on the zero-page.
+            const byte = (try self.fetch() + self.x) % 0xFF;
+            const lo = try self.bus.read(makeWord(0x00, byte));
+            const hi = try self.bus.read(makeWord(0x00, byte + 1));
+            const effective_address = makeWord(hi, lo);
+            operand = try self.bus.read(effective_address);
         },
         .IndirectIndexed => {
             // The operand is a zero-page address to a pointer. Y is added to
@@ -330,6 +335,24 @@ test "LDA Absolute,Y" {
     try bus.write(0x0002, 0xFF); // Operand high byte
     try bus.write(0xFF08, 0xFF);
     cpu.y = 2; // Y index to be added to get the effective address
+    try cpu.step();
+
+    try testing.expectEqual(expected_byte, cpu.a);
+}
+
+test "LDA IndexedIndirect" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0xFF;
+
+    try bus.write(0x0000, 0xA1); // LDA IndirectIndexed Instruction
+    try bus.write(0x0001, 0x70); // Operand
+
+    // Contents at 0x0075 which contains the effective address
+    try bus.write(0x0075, 0x23); // Low Byte
+    try bus.write(0x0076, 0x30); // High Byte
+    try bus.write(0x3023, expected_byte);
+    cpu.x = 0x05; // X value to be added to the effective address
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.a);
