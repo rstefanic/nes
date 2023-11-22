@@ -161,6 +161,8 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .SEI => self.sei(),
         .CLI => self.cli(),
         .LDA => self.lda(operand.?),
+        .LDX => self.ldx(operand.?),
+        .LDY => self.ldy(operand.?),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
 
@@ -197,6 +199,20 @@ fn cli(self: *Cpu) void {
 
 fn lda(self: *Cpu, value: u8) void {
     self.a = value;
+
+    self.handleZeroFlagStatus(value);
+    self.handleNegativeFlagStatus(value);
+}
+
+fn ldx(self: *Cpu, value: u8) void {
+    self.x = value;
+
+    self.handleZeroFlagStatus(value);
+    self.handleNegativeFlagStatus(value);
+}
+
+fn ldy(self: *Cpu, value: u8) void {
+    self.y = value;
 
     self.handleZeroFlagStatus(value);
     self.handleNegativeFlagStatus(value);
@@ -374,4 +390,32 @@ test "LDA IndirectIndexed" {
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.a);
+}
+
+test "LDX ZeroPage,Y" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0xFF;
+
+    try bus.write(0x0000, 0xB6); // LDX ZeroPage,Y Instruction
+    try bus.write(0x0001, 0x06); // Operand
+    try bus.write(0x0007, expected_byte);
+    cpu.y = 1; // Y offset
+    try cpu.step();
+
+    try testing.expectEqual(expected_byte, cpu.x);
+}
+
+test "LDY" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0xFF;
+
+    try bus.write(0x0000, 0xAC); // LDY Absolute Instruction
+    try bus.write(0x0001, 0x06); // Operand low byte
+    try bus.write(0x0002, 0xFF); // Operand high byte
+    try bus.write(0xFF06, expected_byte);
+    try cpu.step();
+
+    try testing.expectEqual(expected_byte, cpu.y);
 }
