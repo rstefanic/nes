@@ -155,6 +155,7 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .LDA => self.lda(address.?),
         .LDX => self.ldx(address.?),
         .LDY => self.ldy(address.?),
+        .STA => self.sta(address.?),
         .JMP => self.jmp(address.?),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
@@ -212,6 +213,10 @@ fn ldy(self: *Cpu, address: u16) void {
 
     self.handleZeroFlagStatus(value);
     self.handleNegativeFlagStatus(value);
+}
+
+fn sta(self: *Cpu, address: u16) void {
+    try self.bus.write(address, self.a);
 }
 
 fn jmp(self: *Cpu, address: u16) void {
@@ -418,6 +423,20 @@ test "LDY" {
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.y);
+}
+
+test "STA" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0xFF;
+    cpu.a = expected_byte;
+
+    try bus.write(0x0000, 0x8D); // STA Absolute Instruction
+    try bus.write(0x0001, 0x00);
+    try bus.write(0x0002, 0x10);
+    try cpu.step();
+
+    try testing.expectEqual(expected_byte, try bus.read(0x1000));
 }
 
 test "JMP Absolute" {
