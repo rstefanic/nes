@@ -123,7 +123,9 @@ fn execute(self: *Cpu, ins: Instruction) !void {
             const lo = try self.fetch();
             const hi = try self.fetch();
             const indirect_addr = makeWord(hi, lo);
-            address = try self.bus.read(indirect_addr);
+            const effective_lo = try self.bus.read(indirect_addr);
+            const effective_hi = try self.bus.read(indirect_addr + 1);
+            address = makeWord(effective_hi, effective_lo);
         },
         .IndexedIndirect => {
             // The operand + X is a lookup address on the zero-page. This address contains the
