@@ -62,14 +62,14 @@ inline fn fetch(self: *Cpu) !u8 {
 }
 
 fn execute(self: *Cpu, ins: Instruction) !void {
-    var operand: ?u8 = null;
+    var address: ?u16 = null;
     switch (ins.mode) {
-        .Implied => operand = null,
+        .Implied, .Accumulator => address = null,
         .Immediate => {
-            operand = try self.fetch();
-        },
-        .Accumulator => {
-            operand = self.a;
+            address = self.pc;
+            // Take the next byte since it'll
+            // be consumed by the instruction.
+            _ = try self.fetch();
         },
         .Relative => {
             // The following byte to be read is signed. Once the sign is known,
@@ -86,52 +86,44 @@ fn execute(self: *Cpu, ins: Instruction) !void {
             const unsigned_byte: u8 = @intCast(signed_byte);
             var offset = self.pc;
             if (is_negative) offset -= unsigned_byte else offset += unsigned_byte;
-
-            operand = try self.bus.read(offset);
+            address = offset;
         },
         .Absolute => {
             const lo = try self.fetch();
             const hi = try self.fetch();
-            const address = makeWord(hi, lo);
-            operand = try self.bus.read(address);
+            address = makeWord(hi, lo);
         },
         .AbsoluteX => {
             const lo = try self.fetch();
             const hi = try self.fetch();
-            const address = makeWord(hi, lo);
-            operand = try self.bus.read(address + self.x);
+            address = makeWord(hi, lo) + self.x;
         },
         .AbsoluteY => {
             const lo = try self.fetch();
             const hi = try self.fetch();
-            const address = makeWord(hi, lo);
-            operand = try self.bus.read(address + self.y);
+            address = makeWord(hi, lo) + self.y;
         },
         .ZeroPage => {
             const lo = try self.fetch();
-            const address = makeWord(0x00, lo);
-            operand = try self.bus.read(address);
+            address = makeWord(0x00, lo);
         },
         .ZeroPageX => {
             const byte = try self.fetch();
             // The address here needs to wrap around
             // and always remain on the Zero Page.
-            const address = (byte + self.x) % 255;
-            operand = try self.bus.read(address);
+            address = (byte + self.x) % 255;
         },
         .ZeroPageY => {
             const byte = try self.fetch();
             // The address here needs to wrap around
             // and always remain on the Zero Page.
-            const address = (byte + self.y) % 255;
-            operand = try self.bus.read(address);
+            address = (byte + self.y) % 255;
         },
         .Indirect => {
             const lo = try self.fetch();
             const hi = try self.fetch();
             const indirect_addr = makeWord(hi, lo);
-            const address = try self.bus.read(indirect_addr);
-            operand = try self.bus.read(address);
+            address = try self.bus.read(indirect_addr);
         },
         .IndexedIndirect => {
             // The operand + X is a lookup address on the zero-page. This address contains the
@@ -140,8 +132,7 @@ fn execute(self: *Cpu, ins: Instruction) !void {
             const byte = (try self.fetch() + self.x) % 0xFF;
             const lo = try self.bus.read(makeWord(0x00, byte));
             const hi = try self.bus.read(makeWord(0x00, byte + 1));
-            const effective_address = makeWord(hi, lo);
-            operand = try self.bus.read(effective_address);
+            address = makeWord(hi, lo);
         },
         .IndirectIndexed => {
             // The operand is a zero-page address to a pointer. Y is added to
@@ -149,8 +140,7 @@ fn execute(self: *Cpu, ins: Instruction) !void {
             const byte = try self.fetch();
             const lo = try self.bus.read(makeWord(0x00, byte));
             const hi = try self.bus.read(makeWord(0x00, byte + 1));
-            const effective_address = makeWord(hi, lo) + self.y;
-            operand = try self.bus.read(effective_address);
+            address = makeWord(hi, lo) + self.y;
         },
     }
 
@@ -160,9 +150,9 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .CLV => self.clv(),
         .SEI => self.sei(),
         .CLI => self.cli(),
-        .LDA => self.lda(operand.?),
-        .LDX => self.ldx(operand.?),
-        .LDY => self.ldy(operand.?),
+        .LDA => self.lda(address.?),
+        .LDX => self.ldx(address.?),
+        .LDY => self.ldy(address.?),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
 
@@ -197,21 +187,24 @@ fn cli(self: *Cpu) void {
     self.status.interrupt_disable = false;
 }
 
-fn lda(self: *Cpu, value: u8) void {
+fn lda(self: *Cpu, address: u16) void {
+    const value = try self.bus.read(address);
     self.a = value;
 
     self.handleZeroFlagStatus(value);
     self.handleNegativeFlagStatus(value);
 }
 
-fn ldx(self: *Cpu, value: u8) void {
+fn ldx(self: *Cpu, address: u16) void {
+    const value = try self.bus.read(address);
     self.x = value;
 
     self.handleZeroFlagStatus(value);
     self.handleNegativeFlagStatus(value);
 }
 
-fn ldy(self: *Cpu, value: u8) void {
+fn ldy(self: *Cpu, address: u16) void {
+    const value = try self.bus.read(address);
     self.y = value;
 
     self.handleZeroFlagStatus(value);
