@@ -155,6 +155,7 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .LDA => self.lda(address.?),
         .LDX => self.ldx(address.?),
         .LDY => self.ldy(address.?),
+        .JMP => self.jmp(address.?),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
 
@@ -211,6 +212,10 @@ fn ldy(self: *Cpu, address: u16) void {
 
     self.handleZeroFlagStatus(value);
     self.handleNegativeFlagStatus(value);
+}
+
+fn jmp(self: *Cpu, address: u16) void {
+    self.pc = address;
 }
 
 test "SEC" {
@@ -413,4 +418,32 @@ test "LDY" {
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.y);
+}
+
+test "JMP Absolute" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_pc: u16 = 0x4030;
+
+    try bus.write(0x0000, 0x4C); // JMP Absolute
+    try bus.write(0x0001, 0x30);
+    try bus.write(0x0002, 0x40);
+    try cpu.step();
+
+    try testing.expectEqual(expected_pc, cpu.pc);
+}
+
+test "JMP Indirect" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_pc: u16 = 0x2010;
+
+    try bus.write(0x0000, 0x6C); // JMP Indirect
+    try bus.write(0x0001, 0x30); // Indirect low byte
+    try bus.write(0x0002, 0x40); // Indirect high byte
+    try bus.write(0x4030, 0x10);
+    try bus.write(0x4031, 0x20);
+    try cpu.step();
+
+    try testing.expectEqual(expected_pc, cpu.pc);
 }
