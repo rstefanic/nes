@@ -164,6 +164,7 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .TYA => self.tya(),
         .TXS => self.txs(),
         .TSX => self.tsx(),
+        .ADC => self.adc(address.?),
         .JMP => self.jmp(address.?),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
@@ -277,6 +278,36 @@ fn txs(self: *Cpu) void {
 fn tsx(self: *Cpu) void {
     _ = self;
     unreachable;
+}
+
+/// ADC is kind of a pain. It adds three values together: (1) the accumulator,
+/// (2) the byte specified by the operand, and (3) the carry flag. The result
+/// of the operation is stored in the accumulator.
+fn adc(self: *Cpu, address: u16) void {
+    const a = self.a;
+    const value = try self.bus.read(address);
+
+    var sum: u16 = @as(u16, a) + @as(u16, value);
+    var overflow = (a ^ sum) & (value ^ sum) & 0x80 > 0;
+
+    if (self.status.carry) {
+        const carry = 1;
+        const old = sum;
+        sum += carry;
+
+        // NOTE: I'm not sure if we need check if an overflow occurred
+        // from adding the carry bit, but I'm adding it here anyways
+        // just becuase it makes sense to me. ¯\_(ツ)_/¯
+        overflow = overflow or ((old ^ sum) & (carry ^ sum) & 0x80 > 0);
+    }
+
+    const result: u8 = @truncate(sum);
+    self.a = result;
+
+    self.status.carry = sum > 0xFF;
+    self.status.overflow = overflow;
+    self.handleZeroFlagStatus(result);
+    self.handleNegativeFlagStatus(result);
 }
 
 fn jmp(self: *Cpu, address: u16) void {
@@ -573,6 +604,50 @@ test "TYA" {
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.a);
+}
+
+test "ADC Immediate" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_sum: u8 = 0xFF;
+    cpu.a = 0xFE;
+
+    try bus.write(0x0000, 0x69); // ADC Immediate
+    try bus.write(0x0001, 0x01);
+    try cpu.step();
+
+    try testing.expectEqual(expected_sum, cpu.a);
+}
+
+test "ADC Add two signed integers" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_sum: u8 = 0x73; // +115 in hex
+    cpu.a = 0xFB; // -5 in hex
+
+    try bus.write(0x0000, 0x6D); // ADC Absolute instruction
+    try bus.write(0x0001, 0x00);
+    try bus.write(0x0002, 0x10); // At address $1000
+    try bus.write(0x1000, 0x78); // +120 in hex
+    try cpu.step();
+
+    try testing.expectEqual(expected_sum, cpu.a);
+}
+
+test "ADC signed addition with overflow" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_sum: u8 = 0x7B; // +123 in hex
+    cpu.a = 0xFB; // -5 in hex
+
+    try bus.write(0x0000, 0x6D); // ADC Absolute instruction
+    try bus.write(0x0001, 0x00);
+    try bus.write(0x0002, 0x10); // At address $1000
+    try bus.write(0x1000, 0x80); // -128 in hex
+    try cpu.step();
+
+    try testing.expectEqual(expected_sum, cpu.a);
+    try testing.expectEqual(true, cpu.status.overflow);
 }
 
 test "JMP Absolute" {
