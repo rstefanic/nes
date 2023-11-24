@@ -158,6 +158,10 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .STA => self.sta(address.?),
         .STX => self.stx(address.?),
         .STY => self.sty(address.?),
+        .TAX => self.tax(),
+        .TAY => self.tay(),
+        .TXA => self.txa(),
+        .TYA => self.tya(),
         .JMP => self.jmp(address.?),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
@@ -227,6 +231,38 @@ fn stx(self: *Cpu, address: u16) void {
 
 fn sty(self: *Cpu, address: u16) void {
     try self.bus.write(address, self.y);
+}
+
+fn tax(self: *Cpu) void {
+    const value = self.a;
+    self.x = value;
+
+    self.handleZeroFlagStatus(value);
+    self.handleNegativeFlagStatus(value);
+}
+
+fn tay(self: *Cpu) void {
+    const value = self.a;
+    self.y = value;
+
+    self.handleZeroFlagStatus(value);
+    self.handleNegativeFlagStatus(value);
+}
+
+fn txa(self: *Cpu) void {
+    const value = self.x;
+    self.a = value;
+
+    self.handleZeroFlagStatus(value);
+    self.handleNegativeFlagStatus(value);
+}
+
+fn tya(self: *Cpu) void {
+    const value = self.y;
+    self.a = value;
+
+    self.handleZeroFlagStatus(value);
+    self.handleNegativeFlagStatus(value);
 }
 
 fn jmp(self: *Cpu, address: u16) void {
@@ -475,6 +511,54 @@ test "STY" {
     try cpu.step();
 
     try testing.expectEqual(expected_byte, try bus.read(0x1000));
+}
+
+test "TAX" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0xFF;
+    cpu.a = expected_byte;
+
+    try bus.write(0x0000, 0xAA); // TAX Instruction
+    try cpu.step();
+
+    try testing.expectEqual(expected_byte, cpu.x);
+}
+
+test "TAY" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0xFF;
+    cpu.a = expected_byte;
+
+    try bus.write(0x0000, 0xA8); // TAY Instruction
+    try cpu.step();
+
+    try testing.expectEqual(expected_byte, cpu.y);
+}
+
+test "TXA" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0xFF;
+    cpu.x = expected_byte;
+
+    try bus.write(0x0000, 0x8A); // TXA Instruction
+    try cpu.step();
+
+    try testing.expectEqual(expected_byte, cpu.a);
+}
+
+test "TYA" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0xFF;
+    cpu.y = expected_byte;
+
+    try bus.write(0x0000, 0x98); // TYA Instruction
+    try cpu.step();
+
+    try testing.expectEqual(expected_byte, cpu.a);
 }
 
 test "JMP Absolute" {
