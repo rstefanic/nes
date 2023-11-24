@@ -156,6 +156,8 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .LDX => self.ldx(address.?),
         .LDY => self.ldy(address.?),
         .STA => self.sta(address.?),
+        .STX => self.stx(address.?),
+        .STY => self.sty(address.?),
         .JMP => self.jmp(address.?),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
@@ -217,6 +219,14 @@ fn ldy(self: *Cpu, address: u16) void {
 
 fn sta(self: *Cpu, address: u16) void {
     try self.bus.write(address, self.a);
+}
+
+fn stx(self: *Cpu, address: u16) void {
+    try self.bus.write(address, self.x);
+}
+
+fn sty(self: *Cpu, address: u16) void {
+    try self.bus.write(address, self.y);
 }
 
 fn jmp(self: *Cpu, address: u16) void {
@@ -432,6 +442,34 @@ test "STA" {
     cpu.a = expected_byte;
 
     try bus.write(0x0000, 0x8D); // STA Absolute Instruction
+    try bus.write(0x0001, 0x00);
+    try bus.write(0x0002, 0x10);
+    try cpu.step();
+
+    try testing.expectEqual(expected_byte, try bus.read(0x1000));
+}
+
+test "STX" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0xFF;
+    cpu.x = expected_byte;
+
+    try bus.write(0x0000, 0x8E); // STX Absolute Instruction
+    try bus.write(0x0001, 0x00);
+    try bus.write(0x0002, 0x10);
+    try cpu.step();
+
+    try testing.expectEqual(expected_byte, try bus.read(0x1000));
+}
+
+test "STY" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0xFF;
+    cpu.y = expected_byte;
+
+    try bus.write(0x0000, 0x8C); // STY Absolute Instruction
     try bus.write(0x0001, 0x00);
     try bus.write(0x0002, 0x10);
     try cpu.step();
