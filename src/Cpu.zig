@@ -162,6 +162,8 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .TAY => self.tay(),
         .TXA => self.txa(),
         .TYA => self.tya(),
+        .TXS => self.txs(),
+        .TSX => self.tsx(),
         .JMP => self.jmp(address.?),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
@@ -263,6 +265,18 @@ fn tya(self: *Cpu) void {
 
     self.handleZeroFlagStatus(value);
     self.handleNegativeFlagStatus(value);
+}
+
+// TODO: Fix me once the stack is implemented!
+fn txs(self: *Cpu) void {
+    _ = self;
+    unreachable;
+}
+
+// TODO: Fix me once the stack is implemented!
+fn tsx(self: *Cpu) void {
+    _ = self;
+    unreachable;
 }
 
 fn jmp(self: *Cpu, address: u16) void {
