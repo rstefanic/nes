@@ -175,6 +175,9 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .DEY => self.dey(),
         .INC => self.inc(address.?),
         .DEC => self.dec(address.?),
+        .CMP => self.cmp(address.?),
+        .CPX => self.cpx(address.?),
+        .CPY => self.cpy(address.?),
         .JMP => self.jmp(address.?),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
@@ -416,6 +419,33 @@ fn dec(self: *Cpu, address: u16) void {
     const result = value -% 1;
     try self.bus.write(address, result);
 
+    self.handleZeroFlagStatus(result);
+    self.handleNegativeFlagStatus(result);
+}
+
+fn cmp(self: *Cpu, address: u16) void {
+    const value = try self.bus.read(address);
+    const result = self.a -% value;
+
+    self.status.carry = self.a >= value;
+    self.handleZeroFlagStatus(result);
+    self.handleNegativeFlagStatus(result);
+}
+
+fn cpx(self: *Cpu, address: u16) void {
+    const value = try self.bus.read(address);
+    const result = self.x -% value;
+
+    self.status.carry = self.x >= value;
+    self.handleZeroFlagStatus(result);
+    self.handleNegativeFlagStatus(result);
+}
+
+fn cpy(self: *Cpu, address: u16) void {
+    const value = try self.bus.read(address);
+    const result = self.y -% value;
+
+    self.status.carry = self.y >= value;
     self.handleZeroFlagStatus(result);
     self.handleNegativeFlagStatus(result);
 }
@@ -904,6 +934,45 @@ test "DEC" {
     try cpu.step();
 
     try testing.expectEqual(expected_value, try bus.read(0x00FF));
+}
+
+test "CMP" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    cpu.a = 0xFF;
+
+    try bus.write(0x0000, 0xC9); // CMP Immediate instruction
+    try bus.write(0x0001, 0xFF);
+    try cpu.step();
+
+    try testing.expect(cpu.status.carry);
+    try testing.expect(cpu.status.zero_result);
+}
+
+test "CPX" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    cpu.x = 0x00;
+
+    try bus.write(0x0000, 0xE0); // CPX Immediate instruction
+    try bus.write(0x0001, 0xFF);
+    try cpu.step();
+
+    try testing.expect(!cpu.status.carry);
+}
+
+test "CPY" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    cpu.y = 0x10;
+
+    try bus.write(0x0000, 0xCC); // CPY Absolute instruction
+    try bus.write(0x0001, 0x00);
+    try bus.write(0x0002, 0x01);
+    try bus.write(0x0100, 0x0F);
+    try cpu.step();
+
+    try testing.expect(cpu.status.carry);
 }
 
 test "JMP Absolute" {
