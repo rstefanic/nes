@@ -166,6 +166,7 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .TSX => self.tsx(),
         .ADC => self.adc(address.?),
         .SBC => self.sbc(address.?),
+        .AND => self.aand(address.?),
         .JMP => self.jmp(address.?),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
@@ -330,6 +331,15 @@ fn sbc(self: *Cpu, address: u16) void {
 
     self.status.carry = diff > 0xFF;
     self.status.overflow = overflow;
+    self.handleZeroFlagStatus(result);
+    self.handleNegativeFlagStatus(result);
+}
+
+fn aand(self: *Cpu, address: u16) void {
+    const a = self.a;
+    const value = try self.bus.read(address);
+    const result = a & value;
+
     self.handleZeroFlagStatus(result);
     self.handleNegativeFlagStatus(result);
 }
@@ -703,6 +713,19 @@ test "SBC signed subtraction with overflow" {
 
     try testing.expectEqual(expected_sum, cpu.a);
     try testing.expectEqual(true, cpu.status.overflow);
+}
+
+test "AND" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    cpu.a = 0x00;
+
+    try bus.write(0x0000, 0x29); // AND Immediate instruction
+    try bus.write(0x0001, 0x00);
+    try cpu.step();
+
+    try testing.expectEqual(true, cpu.status.zero_result);
+    try testing.expectEqual(false, cpu.status.negative_result);
 }
 
 test "JMP Absolute" {
