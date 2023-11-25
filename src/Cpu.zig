@@ -173,6 +173,8 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .INY => self.iny(),
         .DEX => self.dex(),
         .DEY => self.dey(),
+        .INC => self.inc(address.?),
+        .DEC => self.dec(address.?),
         .JMP => self.jmp(address.?),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
@@ -395,6 +397,24 @@ fn dex(self: *Cpu) void {
 fn dey(self: *Cpu) void {
     const result = self.y -% 1;
     self.y = result;
+
+    self.handleZeroFlagStatus(result);
+    self.handleNegativeFlagStatus(result);
+}
+
+fn inc(self: *Cpu, address: u16) void {
+    const value = try self.bus.read(address);
+    const result = value +% 1;
+    try self.bus.write(address, result);
+
+    self.handleZeroFlagStatus(result);
+    self.handleNegativeFlagStatus(result);
+}
+
+fn dec(self: *Cpu, address: u16) void {
+    const value = try self.bus.read(address);
+    const result = value -% 1;
+    try self.bus.write(address, result);
 
     self.handleZeroFlagStatus(result);
     self.handleNegativeFlagStatus(result);
@@ -856,6 +876,34 @@ test "DEY allows for overflow" {
 
     try testing.expectEqual(expected_value, cpu.y);
     try testing.expect(cpu.status.zero_result);
+}
+
+test "INC" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_value: u8 = 0x00;
+
+    try bus.write(0x0000, 0xE6); // INC ZeroPage instruction
+    try bus.write(0x0001, 0xFF);
+    try bus.write(0x00FF, 0xFF); // Value at ZeroPage $FF
+    try cpu.step();
+
+    try testing.expectEqual(expected_value, try bus.read(0x00FF));
+    try testing.expect(cpu.status.zero_result);
+}
+
+test "DEC" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_value: u8 = 0xFF;
+
+    try bus.write(0x0000, 0xCE); // DEC Absolute instruction
+    try bus.write(0x0001, 0xFF);
+    try bus.write(0x0002, 0x00);
+    try bus.write(0x00FF, 0x00); // Value at ZeroPage $FF
+    try cpu.step();
+
+    try testing.expectEqual(expected_value, try bus.read(0x00FF));
 }
 
 test "JMP Absolute" {
