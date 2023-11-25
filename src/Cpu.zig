@@ -167,6 +167,8 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .ADC => self.adc(address.?),
         .SBC => self.sbc(address.?),
         .AND => self.aand(address.?),
+        .ORA => self.ora(address.?),
+        .EOR => self.eor(address.?),
         .JMP => self.jmp(address.?),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
@@ -339,6 +341,24 @@ fn aand(self: *Cpu, address: u16) void {
     const a = self.a;
     const value = try self.bus.read(address);
     const result = a & value;
+
+    self.handleZeroFlagStatus(result);
+    self.handleNegativeFlagStatus(result);
+}
+
+fn ora(self: *Cpu, address: u16) void {
+    const a = self.a;
+    const value = try self.bus.read(address);
+    const result = a | value;
+
+    self.handleZeroFlagStatus(result);
+    self.handleNegativeFlagStatus(result);
+}
+
+fn eor(self: *Cpu, address: u16) void {
+    const a = self.a;
+    const value = try self.bus.read(address);
+    const result = a ^ value;
 
     self.handleZeroFlagStatus(result);
     self.handleNegativeFlagStatus(result);
@@ -722,6 +742,32 @@ test "AND" {
 
     try bus.write(0x0000, 0x29); // AND Immediate instruction
     try bus.write(0x0001, 0x00);
+    try cpu.step();
+
+    try testing.expectEqual(true, cpu.status.zero_result);
+    try testing.expectEqual(false, cpu.status.negative_result);
+}
+
+test "ORA" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    cpu.a = 0x01;
+
+    try bus.write(0x0000, 0x09); // ORA Immediate instruction
+    try bus.write(0x0001, 0x00);
+    try cpu.step();
+
+    try testing.expectEqual(false, cpu.status.zero_result);
+    try testing.expectEqual(false, cpu.status.negative_result);
+}
+
+test "EOR" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    cpu.a = 0x01;
+
+    try bus.write(0x0000, 0x49); // EOR Immediate instruction
+    try bus.write(0x0001, 0x01);
     try cpu.step();
 
     try testing.expectEqual(true, cpu.status.zero_result);
