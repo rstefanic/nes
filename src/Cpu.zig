@@ -169,6 +169,8 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .AND => self.aand(address.?),
         .ORA => self.ora(address.?),
         .EOR => self.eor(address.?),
+        .INX => self.inx(),
+        .INY => self.iny(),
         .JMP => self.jmp(address.?),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
@@ -359,6 +361,22 @@ fn eor(self: *Cpu, address: u16) void {
     const a = self.a;
     const value = try self.bus.read(address);
     const result = a ^ value;
+
+    self.handleZeroFlagStatus(result);
+    self.handleNegativeFlagStatus(result);
+}
+
+fn inx(self: *Cpu) void {
+    const result = self.x +% 1;
+    self.x = result;
+
+    self.handleZeroFlagStatus(result);
+    self.handleNegativeFlagStatus(result);
+}
+
+fn iny(self: *Cpu) void {
+    const result = self.y +% 1;
+    self.y = result;
 
     self.handleZeroFlagStatus(result);
     self.handleNegativeFlagStatus(result);
@@ -772,6 +790,29 @@ test "EOR" {
 
     try testing.expectEqual(true, cpu.status.zero_result);
     try testing.expectEqual(false, cpu.status.negative_result);
+}
+
+test "INX allows for overflow" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    cpu.x = 0xFF;
+
+    try bus.write(0x0000, 0xE8); // INX instruction
+    try cpu.step();
+
+    try testing.expect(cpu.status.zero_result);
+}
+
+test "INY" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_value: u8 = 0x01;
+    cpu.y = 0x00;
+
+    try bus.write(0x0000, 0xC8); // INY instruction
+    try cpu.step();
+
+    try testing.expectEqual(expected_value, cpu.y);
 }
 
 test "JMP Absolute" {
