@@ -171,6 +171,8 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .EOR => self.eor(address.?),
         .INX => self.inx(),
         .INY => self.iny(),
+        .DEX => self.dex(),
+        .DEY => self.dey(),
         .JMP => self.jmp(address.?),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
@@ -376,6 +378,22 @@ fn inx(self: *Cpu) void {
 
 fn iny(self: *Cpu) void {
     const result = self.y +% 1;
+    self.y = result;
+
+    self.handleZeroFlagStatus(result);
+    self.handleNegativeFlagStatus(result);
+}
+
+fn dex(self: *Cpu) void {
+    const result = self.x -% 1;
+    self.x = result;
+
+    self.handleZeroFlagStatus(result);
+    self.handleNegativeFlagStatus(result);
+}
+
+fn dey(self: *Cpu) void {
+    const result = self.y -% 1;
     self.y = result;
 
     self.handleZeroFlagStatus(result);
@@ -813,6 +831,31 @@ test "INY" {
     try cpu.step();
 
     try testing.expectEqual(expected_value, cpu.y);
+}
+
+test "DEX allows for overflow" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_value: u8 = 0xFF;
+    cpu.x = 0x00;
+
+    try bus.write(0x0000, 0xCA); // DEX instruction
+    try cpu.step();
+
+    try testing.expectEqual(expected_value, cpu.x);
+}
+
+test "DEY allows for overflow" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_value: u8 = 0x00;
+    cpu.y = 0x01;
+
+    try bus.write(0x0000, 0x88); // DEY instruction
+    try cpu.step();
+
+    try testing.expectEqual(expected_value, cpu.y);
+    try testing.expect(cpu.status.zero_result);
 }
 
 test "JMP Absolute" {
