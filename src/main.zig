@@ -1,19 +1,23 @@
 const std = @import("std");
 const Bus = @import("Bus.zig");
 const Cpu = @import("Cpu.zig");
-
-const sleep = std.time.sleep;
-const testing = std.testing;
+const raylib = @cImport({
+    @cInclude("raylib.h");
+});
 
 pub fn main() !void {
     var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    _ = Cpu.init(&bus);
 
-    try bus.write(0x0000, 0x38);
+    raylib.SetConfigFlags(raylib.FLAG_VSYNC_HINT);
+    raylib.InitWindow(800, 600, "NES");
+    defer raylib.CloseWindow();
 
-    while (true) {
-        try cpu.step();
-        std.debug.print("{d}\n", .{cpu.pc});
-        sleep(1_000_000_000);
+    while (!raylib.WindowShouldClose()) {
+        raylib.BeginDrawing();
+        defer raylib.EndDrawing();
+
+        raylib.ClearBackground(raylib.RAYWHITE);
+        raylib.DrawText("Work in progress...", 300, 250, 20, raylib.LIGHTGRAY);
     }
 }
