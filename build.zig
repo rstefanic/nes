@@ -1,4 +1,5 @@
 const std = @import("std");
+const raylib_build = @import("libs/raylib/src/build.zig");
 
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
@@ -15,6 +16,8 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
+    const raylib = raylib_build.addRaylib(b, target, optimize, .{});
+
     const exe = b.addExecutable(.{
         .name = "nes",
         // In this case the main source file is merely a path, however, in more
@@ -23,6 +26,9 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+
+    exe.linkLibrary(raylib);
+    exe.addIncludePath(.{ .path = "libs/raylib/src" });
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
