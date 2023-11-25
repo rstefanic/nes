@@ -165,6 +165,7 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .TXS => self.txs(),
         .TSX => self.tsx(),
         .ADC => self.adc(address.?),
+        .SBC => self.sbc(address.?),
         .JMP => self.jmp(address.?),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
@@ -305,6 +306,29 @@ fn adc(self: *Cpu, address: u16) void {
     self.a = result;
 
     self.status.carry = sum > 0xFF;
+    self.status.overflow = overflow;
+    self.handleZeroFlagStatus(result);
+    self.handleNegativeFlagStatus(result);
+}
+
+fn sbc(self: *Cpu, address: u16) void {
+    const a = self.a;
+    const value = try self.bus.read(address);
+
+    var diff: u16 = @as(u16, a) -% @as(u16, value);
+    var overflow = (a ^ diff) & (value ^ diff) & 0x80 <= 0;
+
+    if (self.status.carry) {
+        const carry = 1;
+        const old = diff;
+        diff -= carry;
+        overflow = overflow or ((old ^ diff) & (carry ^ diff) & 0x80 <= 0);
+    }
+
+    const result: u8 = @truncate(diff);
+    self.a = result;
+
+    self.status.carry = diff > 0xFF;
     self.status.overflow = overflow;
     self.handleZeroFlagStatus(result);
     self.handleNegativeFlagStatus(result);
@@ -644,6 +668,37 @@ test "ADC signed addition with overflow" {
     try bus.write(0x0001, 0x00);
     try bus.write(0x0002, 0x10); // At address $1000
     try bus.write(0x1000, 0x80); // -128 in hex
+    try cpu.step();
+
+    try testing.expectEqual(expected_sum, cpu.a);
+    try testing.expectEqual(true, cpu.status.overflow);
+}
+
+test "SBC signed subtraction" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_sum: u8 = 0xFD; // -3 in hex
+    cpu.a = 0xFE; // -2 in hex
+
+    try bus.write(0x0000, 0xED); // SBC Absolute instruction
+    try bus.write(0x0001, 0x00);
+    try bus.write(0x0002, 0x10); // At address $1000
+    try bus.write(0x1000, 0x01); // +1 in hex
+    try cpu.step();
+
+    try testing.expectEqual(expected_sum, cpu.a);
+}
+
+test "SBC signed subtraction with overflow" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_sum: u8 = 0x80; // -128 in hex
+    cpu.a = 0x7F; // 127 in hex
+
+    try bus.write(0x0000, 0xED); // SBC Absolute instruction
+    try bus.write(0x0001, 0x00);
+    try bus.write(0x0002, 0x10); // At address $1000
+    try bus.write(0x1000, 0xFF); // -1 in hex
     try cpu.step();
 
     try testing.expectEqual(expected_sum, cpu.a);
