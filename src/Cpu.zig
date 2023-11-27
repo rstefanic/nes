@@ -207,6 +207,7 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .CMP => self.cmp(address.?),
         .CPX => self.cpx(address.?),
         .CPY => self.cpy(address.?),
+        .BIT => self.bit(address.?),
         .JMP => self.jmp(address.?),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
@@ -474,6 +475,18 @@ fn cpy(self: *Cpu, address: u16) void {
     self.status.carry = self.y >= value;
     self.handleZeroFlagStatus(result);
     self.handleNegativeFlagStatus(result);
+}
+
+fn bit(self: *Cpu, address: u16) void {
+    const a = self.a;
+    const value = try self.bus.read(address);
+    const result = a & value;
+
+    // For BIT, the zero flag is handled as normal but the overflow and negative
+    // flags are set/cleared based on the value from memory and not the result.
+    self.handleZeroFlagStatus(result);
+    self.status.overflow = (value & (1 << 6)) == (1 << 6);
+    self.status.negative_result = (value & (1 << 7)) == (1 << 7);
 }
 
 fn jmp(self: *Cpu, address: u16) void {
@@ -1023,6 +1036,22 @@ test "CPY" {
     try cpu.step();
 
     try testing.expect(cpu.status.carry);
+}
+
+test "BIT" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    cpu.a = 0x02;
+
+    try bus.write(0x0000, 0x2C); // BIT Absolute Instruction
+    try bus.write(0x0001, 0x01);
+    try bus.write(0x0002, 0x0C);
+    try bus.write(0x0C01, 0x8F);
+    try cpu.step();
+
+    try testing.expect(cpu.status.negative_result);
+    try testing.expect(!cpu.status.zero_result);
+    try testing.expect(!cpu.status.overflow);
 }
 
 test "JMP Absolute" {
