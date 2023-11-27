@@ -16,7 +16,7 @@ a: u8 = 0,
 x: u8 = 0,
 y: u8 = 0,
 pc: u16 = 0,
-sp: u16 = 0,
+sp: u8 = 0xFF,
 
 // Status Register
 status: packed struct(u8) {
@@ -47,6 +47,35 @@ pub fn init(bus: *Bus) Cpu {
 
 inline fn makeWord(hi_byte: u8, lo_byte: u8) u16 {
     return (@as(u16, hi_byte) << 8) + lo_byte;
+}
+
+const stack_begin: u16 = 0x0100;
+const stack_end: u16 = 0x01FF;
+
+const StackError = error{
+    StackOverflow,
+    StackUnderflow,
+};
+
+fn stackPush(self: *Cpu, value: u8) !void {
+    const address: u16 = stack_begin + self.sp;
+    if (address > stack_end) {
+        return StackError.StackOverflow;
+    }
+
+    try self.bus.write(address, value);
+    self.sp -= 1;
+}
+
+fn stackPop(self: *Cpu) !u8 {
+    self.sp += 1;
+    const address: u16 = stack_begin + self.sp;
+    if (address <= stack_begin) {
+        return StackError.StackUnderflow;
+    }
+
+    const value = try self.bus.read(address);
+    return value;
 }
 
 pub fn step(self: *Cpu) !void {
