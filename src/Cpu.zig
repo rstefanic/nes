@@ -208,6 +208,7 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .CPX => self.cpx(address.?),
         .CPY => self.cpy(address.?),
         .BIT => self.bit(address.?),
+        .LSR => self.lsr(address),
         .JMP => self.jmp(address.?),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
@@ -487,6 +488,24 @@ fn bit(self: *Cpu, address: u16) void {
     self.handleZeroFlagStatus(result);
     self.status.overflow = (value & (1 << 6)) == (1 << 6);
     self.status.negative_result = (value & (1 << 7)) == (1 << 7);
+}
+
+/// LSR allows the operand to either be a value in memory or the accumulator.
+/// Passing NULL as `address` will perform LSR on the accumulator.
+fn lsr(self: *Cpu, address: ?u16) void {
+    var value = if (address) |addr| try self.bus.read(addr) else self.a;
+
+    const shifted_bit = value & 1;
+    const result = value >> 1;
+    self.status.carry = shifted_bit == 1;
+    self.status.zero_result = shifted_bit == 0;
+    self.status.negative_result = false; // Since the 7th bit will always be 0 from SHL
+
+    if (address) |addr| {
+        try self.bus.write(addr, result);
+    } else {
+        self.a = result;
+    }
 }
 
 fn jmp(self: *Cpu, address: u16) void {
@@ -1052,6 +1071,21 @@ test "BIT" {
     try testing.expect(cpu.status.negative_result);
     try testing.expect(!cpu.status.zero_result);
     try testing.expect(!cpu.status.overflow);
+}
+
+test "LSR" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0x7F;
+    cpu.a = 0xFF;
+
+    try bus.write(0x0000, 0x4A); // LSR Accumulator Instruction
+    try cpu.step();
+
+    try testing.expect(!cpu.status.zero_result);
+    try testing.expect(!cpu.status.negative_result);
+    try testing.expect(cpu.status.carry);
+    try testing.expectEqual(expected_byte, cpu.a);
 }
 
 test "JMP Absolute" {
