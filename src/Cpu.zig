@@ -191,8 +191,8 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .TAY => self.tay(),
         .TXA => self.txa(),
         .TYA => self.tya(),
-        .TXS => self.txs(),
-        .TSX => self.tsx(),
+        .TXS => try self.txs(),
+        .TSX => try self.tsx(),
         .ADC => self.adc(address.?),
         .SBC => self.sbc(address.?),
         .AND => self.aand(address.?),
@@ -310,16 +310,13 @@ fn tya(self: *Cpu) void {
     self.handleNegativeFlagStatus(value);
 }
 
-// TODO: Fix me once the stack is implemented!
-fn txs(self: *Cpu) void {
-    _ = self;
-    unreachable;
+fn txs(self: *Cpu) !void {
+    try self.stackPush(self.x);
 }
 
-// TODO: Fix me once the stack is implemented!
-fn tsx(self: *Cpu) void {
-    _ = self;
-    unreachable;
+fn tsx(self: *Cpu) !void {
+    const value = try self.stackPop();
+    self.x = value;
 }
 
 /// ADC is kind of a pain. It adds three values together: (1) the accumulator,
@@ -773,6 +770,30 @@ test "TYA" {
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.a);
+}
+
+test "TXS" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0xFF;
+    cpu.x = 0xFF;
+
+    try bus.write(0x0000, 0x9A); // TXS Instruction
+    try cpu.step();
+
+    try testing.expectEqual(expected_byte, try cpu.stackPop());
+}
+
+test "TSX" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0xFF;
+    try cpu.stackPush(expected_byte);
+
+    try bus.write(0x0000, 0xBA); // TSX Instruction
+    try cpu.step();
+
+    try testing.expectEqual(expected_byte, cpu.x);
 }
 
 test "ADC Immediate" {
