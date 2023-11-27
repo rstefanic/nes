@@ -209,6 +209,7 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .CPY => self.cpy(address.?),
         .BIT => self.bit(address.?),
         .LSR => self.lsr(address),
+        .ASL => self.asl(address),
         .JMP => self.jmp(address.?),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
@@ -500,6 +501,24 @@ fn lsr(self: *Cpu, address: ?u16) void {
     self.status.carry = shifted_bit == 1;
     self.status.zero_result = shifted_bit == 0;
     self.status.negative_result = false; // Since the 7th bit will always be 0 from SHL
+
+    if (address) |addr| {
+        try self.bus.write(addr, result);
+    } else {
+        self.a = result;
+    }
+}
+
+/// ASL allows the operand to either be a value in memory or the accumulator.
+/// Passing NULL as `address` will perform ASL on the accumulator.
+fn asl(self: *Cpu, address: ?u16) void {
+    const value = if (address) |addr| try self.bus.read(addr) else self.a;
+    const shifted_bit: u1 = if ((value & 0x80) == 0x80) 1 else 0;
+    const result = value << 1;
+
+    self.status.carry = shifted_bit == 1;
+    self.handleZeroFlagStatus(result);
+    self.handleNegativeFlagStatus(result);
 
     if (address) |addr| {
         try self.bus.write(addr, result);
@@ -1083,6 +1102,21 @@ test "LSR" {
     try cpu.step();
 
     try testing.expect(!cpu.status.zero_result);
+    try testing.expect(!cpu.status.negative_result);
+    try testing.expect(cpu.status.carry);
+    try testing.expectEqual(expected_byte, cpu.a);
+}
+
+test "ASL" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0x00;
+    cpu.a = 0x80;
+
+    try bus.write(0x0000, 0x0A); // ASL Accumulator Instruction
+    try cpu.step();
+
+    try testing.expect(cpu.status.zero_result);
     try testing.expect(!cpu.status.negative_result);
     try testing.expect(cpu.status.carry);
     try testing.expectEqual(expected_byte, cpu.a);
