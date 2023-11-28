@@ -210,6 +210,8 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .BIT => self.bit(address.?),
         .LSR => self.lsr(address),
         .ASL => self.asl(address),
+        .ROL => self.rol(address),
+        .ROR => self.ror(address),
         .JMP => self.jmp(address.?),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
@@ -515,6 +517,40 @@ fn asl(self: *Cpu, address: ?u16) void {
     const value = if (address) |addr| try self.bus.read(addr) else self.a;
     const shifted_bit: u1 = if ((value & 0x80) == 0x80) 1 else 0;
     const result = value << 1;
+
+    self.status.carry = shifted_bit == 1;
+    self.handleZeroFlagStatus(result);
+    self.handleNegativeFlagStatus(result);
+
+    if (address) |addr| {
+        try self.bus.write(addr, result);
+    } else {
+        self.a = result;
+    }
+}
+
+fn rol(self: *Cpu, address: ?u16) void {
+    const value = if (address) |addr| try self.bus.read(addr) else self.a;
+    const shifted_bit: u1 = if ((value & 0x80) == 0x80) 1 else 0;
+    const carry: u1 = if (self.status.carry) 1 else 0;
+    const result = (value << 1) | carry;
+
+    self.status.carry = shifted_bit == 1;
+    self.handleZeroFlagStatus(result);
+    self.handleNegativeFlagStatus(result);
+
+    if (address) |addr| {
+        try self.bus.write(addr, result);
+    } else {
+        self.a = result;
+    }
+}
+
+fn ror(self: *Cpu, address: ?u16) void {
+    const value = if (address) |addr| try self.bus.read(addr) else self.a;
+    const shifted_bit = value & 1;
+    const carry: u8 = if (self.status.carry) 0x80 else 0x00;
+    const result = (value >> 1) | carry;
 
     self.status.carry = shifted_bit == 1;
     self.handleZeroFlagStatus(result);
@@ -1135,6 +1171,36 @@ test "ASL" {
     try testing.expect(!cpu.status.negative_result);
     try testing.expect(cpu.status.carry);
     try testing.expectEqual(expected_byte, cpu.a);
+}
+
+test "ROL" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0x80;
+    cpu.a = 0xC0;
+
+    try bus.write(0x0000, 0x2A); // ROL Accumulator Instruction
+    try cpu.step();
+
+    try testing.expect(!cpu.status.zero_result);
+    try testing.expect(cpu.status.carry);
+    try testing.expectEqual(expected_byte, cpu.a);
+}
+
+test "ROR" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0x81;
+    cpu.status.carry = true;
+
+    try bus.write(0x0000, 0x66); // ROR Zeropage Instruction
+    try bus.write(0x0001, 0xFF);
+    try bus.write(0x00FF, 0x02);
+    try cpu.step();
+
+    try testing.expect(!cpu.status.zero_result);
+    try testing.expect(!cpu.status.carry);
+    try testing.expectEqual(expected_byte, try bus.read(0x00FF));
 }
 
 test "JMP Absolute" {
