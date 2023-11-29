@@ -204,6 +204,7 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .ROL => self.rol(address),
         .ROR => self.ror(address),
         .JMP => self.jmp(address.?),
+        .BMI => self.bmi(address.?),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
 
@@ -556,6 +557,12 @@ fn ror(self: *Cpu, address: ?u16) void {
 
 fn jmp(self: *Cpu, address: u16) void {
     self.pc = address;
+}
+
+fn bmi(self: *Cpu, address: u16) void {
+    if (self.status.negative_result) {
+        self.pc = address;
+    }
 }
 
 test "SEC" {
@@ -1220,4 +1227,17 @@ test "JMP Indirect" {
     try cpu.step();
 
     try testing.expectEqual(expected_pc, cpu.pc);
+}
+
+test "BMI" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_address: u16 = 0x0081;
+    cpu.status.negative_result = true;
+
+    try bus.write(0x0000, 0x30); // BMI Instruction
+    try bus.write(0x0001, 0x7F);
+    try cpu.step();
+
+    try testing.expectEqual(expected_address, cpu.pc);
 }
