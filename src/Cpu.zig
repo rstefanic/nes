@@ -205,6 +205,7 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .ROR => self.ror(address),
         .JMP => self.jmp(address.?),
         .BMI => self.bmi(address.?),
+        .BPL => self.bpl(address.?),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
 
@@ -561,6 +562,12 @@ fn jmp(self: *Cpu, address: u16) void {
 
 fn bmi(self: *Cpu, address: u16) void {
     if (self.status.negative_result) {
+        self.pc = address;
+    }
+}
+
+fn bpl(self: *Cpu, address: u16) void {
+    if (!self.status.negative_result) {
         self.pc = address;
     }
 }
@@ -1237,6 +1244,19 @@ test "BMI" {
 
     try bus.write(0x0000, 0x30); // BMI Instruction
     try bus.write(0x0001, 0x7F);
+    try cpu.step();
+
+    try testing.expectEqual(expected_address, cpu.pc);
+}
+
+test "BPL" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_address: u16 = 0x0005;
+    cpu.status.negative_result = true;
+
+    try bus.write(0x0000, 0x30); // BPL Instruction
+    try bus.write(0x0001, 0x03);
     try cpu.step();
 
     try testing.expectEqual(expected_address, cpu.pc);
