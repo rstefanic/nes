@@ -101,21 +101,12 @@ fn execute(self: *Cpu, ins: Instruction) !void {
             _ = try self.fetch();
         },
         .Relative => {
-            // The following byte to be read is signed. Once the sign is known,
-            // the byte is converted to be unsigned so it can be used to
-            // add/subtract from the PC register to get the offset.
-            var is_negative = false;
-            var signed_byte: i8 = @bitCast(try self.fetch());
-            if (signed_byte < 0) {
-                is_negative = true;
-                signed_byte *= -1;
+            const offset: i8 = @bitCast(try self.fetch());
+            if (offset < 0) {
+                address = self.pc - @as(u16, @intCast(offset * -1));
+            } else {
+                address = self.pc + @as(u16, @intCast(offset));
             }
-
-            // TODO: I worry about an overflow/underflow that cound occur here.
-            const unsigned_byte: u8 = @intCast(signed_byte);
-            var offset = self.pc;
-            if (is_negative) offset -= unsigned_byte else offset += unsigned_byte;
-            address = offset;
         },
         .Absolute => {
             const lo = try self.fetch();
