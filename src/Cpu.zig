@@ -206,6 +206,7 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .JMP => self.jmp(address.?),
         .BMI => self.bmi(address.?),
         .BPL => self.bpl(address.?),
+        .BRK => try self.brk(),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
 
@@ -570,6 +571,10 @@ fn bpl(self: *Cpu, address: u16) void {
     if (!self.status.negative_result) {
         self.pc = address;
     }
+}
+
+fn brk(self: *Cpu) !void {
+    _ = self;
 }
 
 test "SEC" {
