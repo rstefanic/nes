@@ -213,6 +213,7 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .BEQ => self.beq(address.?),
         .BNE => self.bne(address.?),
         .JSR => try self.jsr(address.?),
+        .RTS => try self.rts(),
         .BRK => try self.brk(),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
@@ -622,6 +623,14 @@ fn jsr(self: *Cpu, address: u16) !void {
     try self.stackPush(@truncate(self.pc & 0x00FF));
 
     self.pc = address;
+}
+
+fn rts(self: *Cpu) !void {
+    const lo = try self.stackPop();
+    const hi = try self.stackPop();
+    const stack_addr = makeWord(hi, lo);
+
+    self.pc = stack_addr;
 }
 
 fn brk(self: *Cpu) !void {
@@ -1414,4 +1423,17 @@ test "JSR" {
     const hi = try cpu.stackPop();
     const stack_addr = makeWord(hi, lo);
     try testing.expectEqual(@as(u16, 0x1003), stack_addr);
+}
+
+test "RTS" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_address: u16 = 0x1000;
+    try cpu.stackPush(0x10);
+    try cpu.stackPush(0x00);
+
+    try bus.write(0x0000, 0x60); // RTS Instruction
+    try cpu.step();
+
+    try testing.expectEqual(expected_address, cpu.pc);
 }
