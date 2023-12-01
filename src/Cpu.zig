@@ -212,6 +212,7 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .BCC => self.bcc(address.?),
         .BEQ => self.beq(address.?),
         .BNE => self.bne(address.?),
+        .JSR => try self.jsr(address.?),
         .BRK => try self.brk(),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
@@ -613,6 +614,14 @@ fn bne(self: *Cpu, address: u16) void {
     if (!self.status.zero_result) {
         self.pc = address;
     }
+}
+
+fn jsr(self: *Cpu, address: u16) !void {
+    // Push the current address onto the stack
+    try self.stackPush(@truncate(self.pc >> 8));
+    try self.stackPush(@truncate(self.pc & 0x00FF));
+
+    self.pc = address;
 }
 
 fn brk(self: *Cpu) !void {
@@ -1385,4 +1394,24 @@ test "BNE" {
     try cpu.step();
 
     try testing.expectEqual(expected_address, cpu.pc);
+}
+
+test "JSR" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_address: u16 = 0x3000;
+    cpu.pc = 0x1000;
+
+    try bus.write(0x1000, 0x20); // JSR Instruction
+    try bus.write(0x1001, 0x00);
+    try bus.write(0x1002, 0x30);
+    try cpu.step();
+
+    try testing.expectEqual(expected_address, cpu.pc);
+
+    // Verify the address pushed to the stack
+    const lo = try cpu.stackPop();
+    const hi = try cpu.stackPop();
+    const stack_addr = makeWord(hi, lo);
+    try testing.expectEqual(@as(u16, 0x1003), stack_addr);
 }
