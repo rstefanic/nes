@@ -214,6 +214,10 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .BNE => self.bne(address.?),
         .JSR => try self.jsr(address.?),
         .RTS => try self.rts(),
+        .PHA => try self.pha(),
+        .PHP => try self.php(),
+        .PLA => try self.pla(),
+        .PLP => try self.plp(),
         .BRK => try self.brk(),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
@@ -631,6 +635,22 @@ fn rts(self: *Cpu) !void {
     const stack_addr = makeWord(hi, lo);
 
     self.pc = stack_addr;
+}
+
+fn pha(self: *Cpu) !void {
+    try self.stackPush(self.a);
+}
+
+fn php(self: *Cpu) !void {
+    try self.stackPush(@bitCast(self.status));
+}
+
+fn pla(self: *Cpu) !void {
+    self.a = try self.stackPop();
+}
+
+fn plp(self: *Cpu) !void {
+    self.status = @bitCast(try self.stackPop());
 }
 
 fn brk(self: *Cpu) !void {
@@ -1436,4 +1456,59 @@ test "RTS" {
     try cpu.step();
 
     try testing.expectEqual(expected_address, cpu.pc);
+}
+
+test "PHA" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0xFF;
+    cpu.a = 0xFF;
+
+    try bus.write(0x0000, 0x48); // PHA Instruction
+    try cpu.step();
+
+    try testing.expectEqual(expected_byte, try cpu.stackPop());
+}
+
+test "PHP" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0x01;
+    cpu.status.carry = true;
+
+    try bus.write(0x0000, 0x08); // PHP Instruction
+    try cpu.step();
+
+    try testing.expectEqual(expected_byte, try cpu.stackPop());
+}
+
+test "PLA" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0xFF;
+    try cpu.stackPush(expected_byte);
+
+    try bus.write(0x0000, 0x68); // PLA Instruction
+    try cpu.step();
+
+    try testing.expectEqual(expected_byte, cpu.a);
+}
+
+test "PLP" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0x03;
+    try cpu.stackPush(expected_byte);
+
+    try bus.write(0x0000, 0x28); // PLP Instruction
+    try cpu.step();
+
+    try testing.expectEqual(expected_byte, @as(u8, @bitCast(cpu.status)));
+    try testing.expect(cpu.status.carry);
+    try testing.expect(cpu.status.zero_result);
+    try testing.expect(!cpu.status.interrupt_disable);
+    try testing.expect(!cpu.status.decimal_mode);
+    try testing.expect(!cpu.status.break_interrupt);
+    try testing.expect(!cpu.status.overflow);
+    try testing.expect(!cpu.status.negative_result);
 }
