@@ -208,6 +208,8 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .BPL => self.bpl(address.?),
         .BVS => self.bvs(address.?),
         .BVC => self.bvc(address.?),
+        .BCS => self.bcs(address.?),
+        .BCC => self.bcc(address.?),
         .BRK => try self.brk(),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
@@ -583,6 +585,18 @@ fn bvs(self: *Cpu, address: u16) void {
 
 fn bvc(self: *Cpu, address: u16) void {
     if (!self.status.overflow) {
+        self.pc = address;
+    }
+}
+
+fn bcs(self: *Cpu, address: u16) void {
+    if (self.status.carry) {
+        self.pc = address;
+    }
+}
+
+fn bcc(self: *Cpu, address: u16) void {
+    if (!self.status.carry) {
         self.pc = address;
     }
 }
@@ -1301,6 +1315,32 @@ test "BVC" {
     cpu.status.overflow = false;
 
     try bus.write(0x0000, 0x50); // BVC Instruction
+    try bus.write(0x0001, 0x03);
+    try cpu.step();
+
+    try testing.expectEqual(expected_address, cpu.pc);
+}
+
+test "BCS" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_address: u16 = 0x0005;
+    cpu.status.carry = true;
+
+    try bus.write(0x0000, 0xB0); // BCS Instruction
+    try bus.write(0x0001, 0x03);
+    try cpu.step();
+
+    try testing.expectEqual(expected_address, cpu.pc);
+}
+
+test "BCC" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_address: u16 = 0x0005;
+    cpu.status.carry = false;
+
+    try bus.write(0x0000, 0x90); // BCC Instruction
     try bus.write(0x0001, 0x03);
     try cpu.step();
 
