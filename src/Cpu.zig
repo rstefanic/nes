@@ -218,6 +218,7 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .PHP => try self.php(),
         .PLA => try self.pla(),
         .PLP => try self.plp(),
+        .RTI => try self.rti(),
         .BRK => try self.brk(),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
@@ -651,6 +652,11 @@ fn pla(self: *Cpu) !void {
 
 fn plp(self: *Cpu) !void {
     self.status = @bitCast(try self.stackPop());
+}
+
+fn rti(self: *Cpu) !void {
+    try self.plp();
+    try self.rts();
 }
 
 fn brk(self: *Cpu) !void {
@@ -1511,4 +1517,20 @@ test "PLP" {
     try testing.expect(!cpu.status.break_interrupt);
     try testing.expect(!cpu.status.overflow);
     try testing.expect(!cpu.status.negative_result);
+}
+
+test "RTI" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_stack_reg: u8 = 0x03;
+    const expected_address: u16 = 0x1000;
+    try cpu.stackPush(0x10); // First push the address in little endian
+    try cpu.stackPush(0x00);
+    try cpu.stackPush(0x03); // Next push the status register
+
+    try bus.write(0x0000, 0x40); // RTI Instruction
+    try cpu.step();
+
+    try testing.expectEqual(expected_stack_reg, @as(u8, @bitCast(cpu.status)));
+    try testing.expectEqual(expected_address, cpu.pc);
 }
