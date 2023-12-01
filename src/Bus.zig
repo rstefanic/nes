@@ -4,7 +4,7 @@ const std = @import("std");
 const Cpu = @import("Cpu.zig");
 
 cpu: ?*Cpu = null,
-memory: [0xFFFF]u8 = std.mem.zeroes([0xFFFF]u8),
+memory: [0x10000]u8 = std.mem.zeroes([0x10000]u8),
 
 const BusError = error{InvalidMemoryAddress};
 
