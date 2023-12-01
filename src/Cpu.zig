@@ -220,6 +220,7 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .PLP => try self.plp(),
         .RTI => try self.rti(),
         .BRK => try self.brk(),
+        .NOP => self.nop(),
         else => return error.OpcodeExecutionNotYetImplemented,
     }
 
@@ -670,6 +671,10 @@ fn brk(self: *Cpu) !void {
     const lo_byte = try self.bus.read(0xFFFE);
     const hi_byte = try self.bus.read(0xFFFF);
     self.pc = makeWord(hi_byte, lo_byte);
+}
+
+fn nop(self: *Cpu) void {
+    _ = self;
 }
 
 test "SEC" {
@@ -1553,6 +1558,17 @@ test "BRK" {
     try bus.write(0x0000, 0x00); // BRK Instruction
     try bus.write(0xFFFE, 0x00); // Set the IRQ/BRK vector
     try bus.write(0xFFFF, 0x01);
+    try cpu.step();
+
+    try testing.expectEqual(expected_address, cpu.pc);
+}
+
+test "NOP" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_address: u16 = 0x0001;
+
+    try bus.write(0x0000, 0xEA); // NOP Instruction
     try cpu.step();
 
     try testing.expectEqual(expected_address, cpu.pc);
