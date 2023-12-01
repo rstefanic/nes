@@ -660,7 +660,16 @@ fn rti(self: *Cpu) !void {
 }
 
 fn brk(self: *Cpu) !void {
-    _ = self;
+    try self.stackPush(@bitCast(self.status));
+
+    // Push the current pc in little endian format
+    try self.stackPush(@truncate(self.pc >> 8));
+    try self.stackPush(@truncate(self.pc & 0x00FF));
+
+    // Read from the IRQ/BRK vector
+    const lo_byte = try self.bus.read(0xFFFE);
+    const hi_byte = try self.bus.read(0xFFFF);
+    self.pc = makeWord(hi_byte, lo_byte);
 }
 
 test "SEC" {
@@ -1532,5 +1541,19 @@ test "RTI" {
     try cpu.step();
 
     try testing.expectEqual(expected_stack_reg, @as(u8, @bitCast(cpu.status)));
+    try testing.expectEqual(expected_address, cpu.pc);
+}
+
+test "BRK" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_address: u16 = 0x0100;
+    cpu.status.negative_result = true;
+
+    try bus.write(0x0000, 0x00); // BRK Instruction
+    try bus.write(0xFFFE, 0x00); // Set the IRQ/BRK vector
+    try bus.write(0xFFFF, 0x01);
+    try cpu.step();
+
     try testing.expectEqual(expected_address, cpu.pc);
 }
