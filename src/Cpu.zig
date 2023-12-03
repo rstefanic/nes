@@ -96,7 +96,7 @@ inline fn addressPagesDiffer(address_a: u16, address_b: u16) bool {
 
 fn execute(self: *Cpu, ins: Instruction) !void {
     var address: ?u16 = null;
-    var additional_cycles: u4 = 0;
+    var additional_cycles: u2 = 0; // u2 since the maximum additional_cycles are 2
 
     switch (ins.mode) {
         .Implied, .Accumulator => address = null,
@@ -108,11 +108,16 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         },
         .Relative => {
             const offset: i8 = @bitCast(try self.fetch());
-            if (offset < 0) {
-                address = self.pc - @as(u16, @intCast(offset * -1));
-            } else {
-                address = self.pc + @as(u16, @intCast(offset));
+            const effective_address = if (offset < 0)
+                self.pc - @as(u16, @intCast(offset * -1))
+            else
+                self.pc + @as(u16, @intCast(offset));
+
+            if (addressPagesDiffer(self.pc, effective_address)) {
+                additional_cycles += 1;
             }
+
+            address = effective_address;
         },
         .Absolute => {
             const lo = try self.fetch();
@@ -225,14 +230,14 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .ROL => self.rol(address),
         .ROR => self.ror(address),
         .JMP => self.jmp(address.?),
-        .BMI => self.bmi(address.?),
-        .BPL => self.bpl(address.?),
-        .BVS => self.bvs(address.?),
-        .BVC => self.bvc(address.?),
-        .BCS => self.bcs(address.?),
-        .BCC => self.bcc(address.?),
-        .BEQ => self.beq(address.?),
-        .BNE => self.bne(address.?),
+        .BMI => self.bmi(address.?, &additional_cycles), // Branching instructions add a cycle if branching occurs.
+        .BPL => self.bpl(address.?, &additional_cycles), // If no branching occurs, then the additional_cycles are
+        .BVS => self.bvs(address.?, &additional_cycles), // set to zero since there are no page boundary penalties.
+        .BVC => self.bvc(address.?, &additional_cycles),
+        .BCS => self.bcs(address.?, &additional_cycles),
+        .BCC => self.bcc(address.?, &additional_cycles),
+        .BEQ => self.beq(address.?, &additional_cycles),
+        .BNE => self.bne(address.?, &additional_cycles),
         .JSR => try self.jsr(address.?),
         .RTS => try self.rts(),
         .PHA => try self.pha(),
@@ -596,51 +601,75 @@ fn jmp(self: *Cpu, address: u16) void {
     self.pc = address;
 }
 
-fn bmi(self: *Cpu, address: u16) void {
+fn bmi(self: *Cpu, address: u16, additional_cycles: *u2) void {
     if (self.status.negative_result) {
         self.pc = address;
+        additional_cycles.* += 1;
+    } else {
+        additional_cycles.* = 0;
     }
 }
 
-fn bpl(self: *Cpu, address: u16) void {
+fn bpl(self: *Cpu, address: u16, additional_cycles: *u2) void {
     if (!self.status.negative_result) {
         self.pc = address;
+        additional_cycles.* += 1;
+    } else {
+        additional_cycles.* = 0;
     }
 }
 
-fn bvs(self: *Cpu, address: u16) void {
+fn bvs(self: *Cpu, address: u16, additional_cycles: *u2) void {
     if (self.status.overflow) {
         self.pc = address;
+        additional_cycles.* += 1;
+    } else {
+        additional_cycles.* = 0;
     }
 }
 
-fn bvc(self: *Cpu, address: u16) void {
+fn bvc(self: *Cpu, address: u16, additional_cycles: *u2) void {
     if (!self.status.overflow) {
         self.pc = address;
+        additional_cycles.* += 1;
+    } else {
+        additional_cycles.* = 0;
     }
 }
 
-fn bcs(self: *Cpu, address: u16) void {
+fn bcs(self: *Cpu, address: u16, additional_cycles: *u2) void {
     if (self.status.carry) {
         self.pc = address;
+        additional_cycles.* += 1;
+    } else {
+        additional_cycles.* = 0;
     }
 }
 
-fn bcc(self: *Cpu, address: u16) void {
+fn bcc(self: *Cpu, address: u16, additional_cycles: *u2) void {
     if (!self.status.carry) {
         self.pc = address;
+        additional_cycles.* += 1;
+    } else {
+        additional_cycles.* = 0;
     }
 }
 
-fn beq(self: *Cpu, address: u16) void {
+fn beq(self: *Cpu, address: u16, additional_cycles: *u2) void {
     if (self.status.zero_result) {
         self.pc = address;
+        additional_cycles.* += 1;
+    } else {
+        additional_cycles.* = 0;
     }
 }
 
-fn bne(self: *Cpu, address: u16) void {
+fn bne(self: *Cpu, address: u16, additional_cycles: *u2) void {
     if (!self.status.zero_result) {
         self.pc = address;
+        additional_cycles.* += 1;
+    } else {
+        additional_cycles.* = 0;
     }
 }
 
@@ -1391,6 +1420,36 @@ test "BMI" {
     try cpu.step();
 
     try testing.expectEqual(expected_address, cpu.pc);
+}
+
+test "BMI branching adds an additional cycle" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_address: u16 = 0x0080;
+    cpu.pc = 0x000E;
+    cpu.status.negative_result = true;
+
+    try bus.write(0x000E, 0x30); // BMI Instruction
+    try bus.write(0x000F, 0x70);
+    try cpu.step();
+
+    try testing.expectEqual(expected_address, cpu.pc);
+    try testing.expectEqual(@as(u64, 3), cpu.cycles);
+}
+
+test "BMI branching with a page boundary adds two additional cycles" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_address: u16 = 0x0100;
+    cpu.pc = 0x00EE;
+    cpu.status.negative_result = true;
+
+    try bus.write(0x00EE, 0x30); // BMI Instruction
+    try bus.write(0x00EF, 0x10);
+    try cpu.step();
+
+    try testing.expectEqual(expected_address, cpu.pc);
+    try testing.expectEqual(@as(u64, 4), cpu.cycles);
 }
 
 test "BPL" {
