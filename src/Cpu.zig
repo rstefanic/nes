@@ -90,8 +90,14 @@ inline fn fetch(self: *Cpu) !u8 {
     return try self.bus.read(address);
 }
 
+inline fn addressPagesDiffer(address_a: u16, address_b: u16) bool {
+    return (address_a & 0xFF00) != (address_b & 0xFF00);
+}
+
 fn execute(self: *Cpu, ins: Instruction) !void {
     var address: ?u16 = null;
+    var additional_cycles: u4 = 0;
+
     switch (ins.mode) {
         .Implied, .Accumulator => address = null,
         .Immediate => {
@@ -116,12 +122,22 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .AbsoluteX => {
             const lo = try self.fetch();
             const hi = try self.fetch();
-            address = makeWord(hi, lo) + self.x;
+            const effective_address = makeWord(hi, lo);
+            if (addressPagesDiffer(effective_address, effective_address + self.x)) {
+                additional_cycles += 1;
+            }
+
+            address = effective_address + self.x;
         },
         .AbsoluteY => {
             const lo = try self.fetch();
             const hi = try self.fetch();
-            address = makeWord(hi, lo) + self.y;
+            const effective_address = makeWord(hi, lo);
+            if (addressPagesDiffer(effective_address, effective_address + self.y)) {
+                additional_cycles += 1;
+            }
+
+            address = effective_address + self.y;
         },
         .ZeroPage => {
             const lo = try self.fetch();
@@ -162,7 +178,12 @@ fn execute(self: *Cpu, ins: Instruction) !void {
             const byte = try self.fetch();
             const lo = try self.bus.read(makeWord(0x00, byte));
             const hi = try self.bus.read(makeWord(0x00, byte + 1));
-            address = makeWord(hi, lo) + self.y;
+            const effective_address = makeWord(hi, lo);
+            if (addressPagesDiffer(effective_address, effective_address + self.y)) {
+                additional_cycles += 1;
+            }
+
+            address = effective_address + self.y;
         },
     }
 
@@ -224,7 +245,7 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         else => return error.OpcodeExecutionNotYetImplemented,
     }
 
-    self.cycles += ins.cycles;
+    self.cycles += ins.cycles + additional_cycles;
 }
 
 inline fn handleZeroFlagStatus(self: *Cpu, byte: u8) void {
@@ -783,6 +804,7 @@ test "LDA Absolute" {
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.a);
+    try testing.expectEqual(@as(u64, 4), cpu.cycles);
 }
 
 test "LDA Absolute,X" {
@@ -798,6 +820,23 @@ test "LDA Absolute,X" {
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.a);
+    try testing.expectEqual(@as(u64, 4), cpu.cycles);
+}
+
+test "LDA Absolute,X add additional cycle for crossing page boundaries" {
+    var bus = Bus{};
+    var cpu = Cpu.init(&bus);
+    const expected_byte: u8 = 0xFF;
+    cpu.x = 1; // X index to be added to get the effective address
+
+    try bus.write(0x0000, 0xBD); // LDA Absolute,X Instruction
+    try bus.write(0x0001, 0xFF); // Operand low byte
+    try bus.write(0x0002, 0xFE); // Operand high byte
+    try bus.write(0xFF00, 0xFF);
+    try cpu.step();
+
+    try testing.expectEqual(expected_byte, cpu.a);
+    try testing.expectEqual(@as(u64, 5), cpu.cycles);
 }
 
 test "LDA Absolute,Y" {
