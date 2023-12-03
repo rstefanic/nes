@@ -48,11 +48,11 @@ pub fn main() !void {
         }
 
         const mem = bus.memory[start_row..end_row];
-        const font_size = 38;
-        const x_spacing = 38;
-        const y_spacing = 38;
+        const font_size = 32;
+        const x_spacing = 42;
+        const y_spacing = 42;
         const x_padding = 10;
-        const address_start = 90;
+        const address_start = 80;
         var x_offset: c_int = x_padding;
         var y_offset: c_int = 0;
 
