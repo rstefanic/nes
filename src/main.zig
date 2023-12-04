@@ -50,14 +50,15 @@ pub fn main() !void {
         // Screen Drawing
 
         const mem = bus.memory[start_row..end_row];
-        const mem_font_size = 32;
-        const instruction_font_size = 24;
         const x_spacing = 42;
         const y_spacing = 42;
-        const x_padding = 10;
+        const window_padding = 10;
         const address_start = 80;
-        var x_offset: c_int = x_padding;
-        var y_offset: c_int = 0;
+        var options: DrawTextOptions = .{
+            .pos_x = window_padding,
+            .pos_y = 0,
+            .font_size = 32,
+        };
 
         // Draw Memory
 
@@ -65,40 +66,37 @@ pub fn main() !void {
             const current_address = start_row + i;
 
             if ((current_address & 0xFFF0) == current_address) {
-                x_offset = x_padding;
-                y_offset += y_spacing;
-                const fmt = try std.fmt.allocPrintZ(allocator, "{x:0>4}", .{current_address});
-                defer allocator.free(fmt);
-                const c_fmt: [*c]const u8 = @ptrCast(fmt);
-                raylib.DrawText(c_fmt, x_offset, y_offset, mem_font_size, raylib.GRAY);
-                x_offset = address_start;
+                options.pos_x = window_padding;
+                options.pos_y += y_spacing;
+                try drawText(allocator, "{x:0>4}", .{current_address}, options);
+                options.pos_x = address_start;
             }
 
-            x_offset += x_spacing;
-            const fmt = try std.fmt.allocPrintZ(allocator, "{x}", .{m});
-            defer allocator.free(fmt);
-            const c_fmt: [*c]const u8 = @ptrCast(fmt);
-            const color = if (pc == current_address) raylib.WHITE else raylib.GRAY;
-            raylib.DrawText(c_fmt, x_offset, y_offset, mem_font_size, color);
+            options.pos_x += x_spacing;
+            options.color = if (pc == current_address) raylib.WHITE else raylib.GRAY;
+            try drawText(allocator, "{x}", .{m}, options);
+            options.color = raylib.GRAY; // Reset color back to GRAY
         }
 
         // Draw CPU Information
 
-        y_offset += y_spacing * 2;
-        var options: DrawTextOptions = .{ .pos_x = x_padding, .pos_y = y_offset, .font_size = instruction_font_size };
+        options.font_size = 24;
+        options.pos_x = window_padding;
+
+        options.pos_y += y_spacing * 2;
         try drawText(allocator, "a: 0x{x:0>2}", .{cpu.a}, options);
 
         options.pos_x += 300;
         try drawText(allocator, "cycles: {d}", .{cpu.cycles}, options);
 
-        options.pos_x = x_padding;
+        options.pos_x = window_padding;
         options.pos_y += y_spacing;
         try drawText(allocator, "x: 0x{x:0>2}", .{cpu.x}, options);
 
         options.pos_x += 300;
         try drawText(allocator, "pc: 0x{x:0>4}", .{cpu.pc}, options);
 
-        options.pos_x = x_padding;
+        options.pos_x = window_padding;
         options.pos_y += y_spacing;
         try drawText(allocator, "y: 0x{x:0>2}", .{cpu.y}, options);
 
@@ -107,7 +105,7 @@ pub fn main() !void {
 
         // Status Registers
         options.pos_y += y_spacing;
-        options.pos_x = x_padding;
+        options.pos_x = window_padding;
         try drawText(allocator, "s:", .{}, options);
 
         options.pos_x += x_spacing;
@@ -144,7 +142,7 @@ pub fn main() !void {
 
         // Draw instructions
         options.pos_y += y_spacing * 2;
-        options.pos_x = x_padding;
+        options.pos_x = window_padding;
         options.color = raylib.GRAY;
         try drawText(allocator, "Press \"s\" or \"<space>\" to step through the next instruction.", .{}, options);
     }
