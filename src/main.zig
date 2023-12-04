@@ -9,7 +9,7 @@ pub fn main() !void {
     var bus = Bus{};
     var cpu = Cpu.init(&bus);
 
-    var buffer: [1000]u8 = undefined;
+    var buffer: [256]u8 = undefined;
     var fba = std.heap.FixedBufferAllocator.init(&buffer);
     const allocator = fba.allocator();
 
