@@ -5,6 +5,9 @@ const raylib = @cImport({
     @cInclude("raylib.h");
 });
 
+const WIDTH = 800;
+const HEIGHT = 600;
+
 pub fn main() !void {
     var bus = Bus{};
     var cpu = Cpu.init(&bus);
@@ -14,7 +17,7 @@ pub fn main() !void {
     const allocator = fba.allocator();
 
     raylib.SetConfigFlags(raylib.FLAG_VSYNC_HINT);
-    raylib.InitWindow(800, 600, "NES");
+    raylib.InitWindow(WIDTH, HEIGHT, "NES");
     defer raylib.CloseWindow();
 
     while (!raylib.WindowShouldClose()) {
@@ -86,21 +89,21 @@ pub fn main() !void {
         options.pos_y += y_spacing * 2;
         try drawText(allocator, "a: 0x{x:0>2}", .{cpu.a}, options);
 
-        options.pos_x += 300;
+        options.pos_x += WIDTH / 2;
         try drawText(allocator, "cycles: {d}", .{cpu.cycles}, options);
 
         options.pos_x = window_padding;
         options.pos_y += y_spacing;
         try drawText(allocator, "x: 0x{x:0>2}", .{cpu.x}, options);
 
-        options.pos_x += 300;
+        options.pos_x += WIDTH / 2;
         try drawText(allocator, "pc: 0x{x:0>4}", .{cpu.pc}, options);
 
         options.pos_x = window_padding;
         options.pos_y += y_spacing;
         try drawText(allocator, "y: 0x{x:0>2}", .{cpu.y}, options);
 
-        options.pos_x += 300;
+        options.pos_x += WIDTH / 2;
         try drawText(allocator, "sp: 0x{x:0>4}", .{cpu.sp}, options);
 
         // Status Registers
