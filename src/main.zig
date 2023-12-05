@@ -1,4 +1,6 @@
 const std = @import("std");
+
+const Cartridge = @import("Cartridge.zig");
 const Console = @import("Console.zig");
 const Cpu = @import("Cpu.zig");
 const raylib = @cImport({
@@ -9,12 +11,20 @@ const WIDTH = 800;
 const HEIGHT = 600;
 
 pub fn main() !void {
+    var buffer: [1000]u8 = undefined;
+    var fba = std.heap.FixedBufferAllocator.init(&buffer);
+    const allocator = fba.allocator();
+
     var console = Console{};
     var cpu = Cpu.init(&console);
 
-    var buffer: [256]u8 = undefined;
-    var fba = std.heap.FixedBufferAllocator.init(&buffer);
-    const allocator = fba.allocator();
+    const args = try std.process.argsAlloc(allocator);
+    if (args.len > 1) { // Treat any arguments as a filepath to a ROM
+        const cartridge_filename = args[1];
+        var cartridge = try Cartridge.init(cartridge_filename);
+        console.connectCartridge(&cartridge);
+    }
+    std.process.argsFree(allocator, args);
 
     raylib.SetConfigFlags(raylib.FLAG_VSYNC_HINT);
     raylib.InitWindow(WIDTH, HEIGHT, "NES");
