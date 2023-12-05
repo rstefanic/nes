@@ -1,15 +1,21 @@
 const Console = @This();
 
 const std = @import("std");
+const Cartridge = @import("Cartridge.zig");
 const Cpu = @import("Cpu.zig");
 
 cpu: ?*Cpu = null,
+cartridge: ?*Cartridge = null,
 memory: [0x10000]u8 = [_]u8{0xEA} ** 0x10000,
 
 const ConsoleError = error{InvalidMemoryAddress};
 
 pub fn connectCpu(self: *Console, cpu: *Cpu) void {
     self.cpu = cpu;
+}
+
+pub fn connectCartridge(self: *Console, cartridge: *Cartridge) void {
+    self.cartridge = cartridge;
 }
 
 pub fn read(self: *Console, address: u16) !u8 {
