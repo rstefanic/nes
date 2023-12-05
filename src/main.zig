@@ -1,5 +1,5 @@
 const std = @import("std");
-const Bus = @import("Bus.zig");
+const Console = @import("Console.zig");
 const Cpu = @import("Cpu.zig");
 const raylib = @cImport({
     @cInclude("raylib.h");
@@ -9,8 +9,8 @@ const WIDTH = 800;
 const HEIGHT = 600;
 
 pub fn main() !void {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
 
     var buffer: [256]u8 = undefined;
     var fba = std.heap.FixedBufferAllocator.init(&buffer);
@@ -45,7 +45,7 @@ pub fn main() !void {
 
         // Draw Memory
 
-        const mdd = MemoryDebugDisplay.init(bus.memory, cpu.pc);
+        const mdd = MemoryDebugDisplay.init(console.memory, cpu.pc);
         for (mdd.memory_display, 0..) |mem, i| {
             const current_address = mdd.starting_address + i;
 

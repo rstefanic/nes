@@ -1,12 +1,12 @@
 const Cpu = @This();
 
 const std = @import("std");
-const Bus = @import("Bus.zig");
+const Console = @import("Console.zig");
 const Instruction = @import("Instruction.zig");
 const testing = std.testing;
 
-// A reference to the Bus so that we can read/write memory
-bus: *Bus,
+// A reference to the console so that we can read/write to memory
+console: *Console,
 
 // Track the number of cycles
 cycles: u64 = 0,
@@ -30,16 +30,16 @@ status: packed struct(u8) {
     negative_result: bool = false,
 } = .{},
 
-pub fn init(bus: *Bus) Cpu {
+pub fn init(console: *Console) Cpu {
     var cpu = Cpu{
-        .bus = bus,
+        .console = console,
     };
 
-    bus.connectCpu(&cpu);
+    console.connectCpu(&cpu);
 
     // Read from the reset vector to init the PC
-    const lo_byte = try bus.read(0xFFFC);
-    const hi_byte = try bus.read(0xFFFD);
+    const lo_byte = try console.read(0xFFFC);
+    const hi_byte = try console.read(0xFFFD);
     cpu.pc = makeWord(hi_byte, lo_byte);
 
     return cpu;
@@ -63,7 +63,7 @@ fn stackPush(self: *Cpu, value: u8) !void {
         return StackError.StackOverflow;
     }
 
-    try self.bus.write(address, value);
+    try self.console.write(address, value);
     self.sp -= 1;
 }
 
@@ -74,7 +74,7 @@ fn stackPop(self: *Cpu) !u8 {
         return StackError.StackUnderflow;
     }
 
-    const value = try self.bus.read(address);
+    const value = try self.console.read(address);
     return value;
 }
 
@@ -87,7 +87,7 @@ pub fn step(self: *Cpu) !void {
 inline fn fetch(self: *Cpu) !u8 {
     const address = self.pc;
     self.pc += 1;
-    return try self.bus.read(address);
+    return try self.console.read(address);
 }
 
 inline fn addressPagesDiffer(address_a: u16, address_b: u16) bool {
@@ -164,8 +164,8 @@ fn execute(self: *Cpu, ins: Instruction) !void {
             const lo = try self.fetch();
             const hi = try self.fetch();
             const indirect_addr = makeWord(hi, lo);
-            const effective_lo = try self.bus.read(indirect_addr);
-            const effective_hi = try self.bus.read(indirect_addr + 1);
+            const effective_lo = try self.console.read(indirect_addr);
+            const effective_hi = try self.console.read(indirect_addr + 1);
             address = makeWord(effective_hi, effective_lo);
         },
         .IndexedIndirect => {
@@ -173,16 +173,16 @@ fn execute(self: *Cpu, ins: Instruction) !void {
             // 16 bit effective address. This lookup address should never overflow onto the
             // next page, so we'll mod the result by 0xFF to stay on the zero-page.
             const byte = (try self.fetch() + self.x) % 0xFF;
-            const lo = try self.bus.read(makeWord(0x00, byte));
-            const hi = try self.bus.read(makeWord(0x00, byte + 1));
+            const lo = try self.console.read(makeWord(0x00, byte));
+            const hi = try self.console.read(makeWord(0x00, byte + 1));
             address = makeWord(hi, lo);
         },
         .IndirectIndexed => {
             // The operand is a zero-page address to a pointer. Y is added to
             // the pointer to mimic indexing giving us the effective address.
             const byte = try self.fetch();
-            const lo = try self.bus.read(makeWord(0x00, byte));
-            const hi = try self.bus.read(makeWord(0x00, byte + 1));
+            const lo = try self.console.read(makeWord(0x00, byte));
+            const hi = try self.console.read(makeWord(0x00, byte + 1));
             const effective_address = makeWord(hi, lo);
             if (addressPagesDiffer(effective_address, effective_address + self.y)) {
                 additional_cycles += 1;
@@ -282,7 +282,7 @@ fn cli(self: *Cpu) void {
 }
 
 fn lda(self: *Cpu, address: u16) void {
-    const value = try self.bus.read(address);
+    const value = try self.console.read(address);
     self.a = value;
 
     self.handleZeroFlagStatus(value);
@@ -290,7 +290,7 @@ fn lda(self: *Cpu, address: u16) void {
 }
 
 fn ldx(self: *Cpu, address: u16) void {
-    const value = try self.bus.read(address);
+    const value = try self.console.read(address);
     self.x = value;
 
     self.handleZeroFlagStatus(value);
@@ -298,7 +298,7 @@ fn ldx(self: *Cpu, address: u16) void {
 }
 
 fn ldy(self: *Cpu, address: u16) void {
-    const value = try self.bus.read(address);
+    const value = try self.console.read(address);
     self.y = value;
 
     self.handleZeroFlagStatus(value);
@@ -306,15 +306,15 @@ fn ldy(self: *Cpu, address: u16) void {
 }
 
 fn sta(self: *Cpu, address: u16) void {
-    try self.bus.write(address, self.a);
+    try self.console.write(address, self.a);
 }
 
 fn stx(self: *Cpu, address: u16) void {
-    try self.bus.write(address, self.x);
+    try self.console.write(address, self.x);
 }
 
 fn sty(self: *Cpu, address: u16) void {
-    try self.bus.write(address, self.y);
+    try self.console.write(address, self.y);
 }
 
 fn tax(self: *Cpu) void {
@@ -363,7 +363,7 @@ fn tsx(self: *Cpu) !void {
 /// of the operation is stored in the accumulator.
 fn adc(self: *Cpu, address: u16) void {
     const a = self.a;
-    const value = try self.bus.read(address);
+    const value = try self.console.read(address);
 
     var sum: u16 = @as(u16, a) + @as(u16, value);
     var overflow = (a ^ sum) & (value ^ sum) & 0x80 > 0;
@@ -390,7 +390,7 @@ fn adc(self: *Cpu, address: u16) void {
 
 fn sbc(self: *Cpu, address: u16) void {
     const a = self.a;
-    const value = try self.bus.read(address);
+    const value = try self.console.read(address);
 
     var diff: u16 = @as(u16, a) -% @as(u16, value);
     var overflow = (a ^ diff) & (value ^ diff) & 0x80 <= 0;
@@ -413,7 +413,7 @@ fn sbc(self: *Cpu, address: u16) void {
 
 fn aand(self: *Cpu, address: u16) void {
     const a = self.a;
-    const value = try self.bus.read(address);
+    const value = try self.console.read(address);
     const result = a & value;
 
     self.handleZeroFlagStatus(result);
@@ -422,7 +422,7 @@ fn aand(self: *Cpu, address: u16) void {
 
 fn ora(self: *Cpu, address: u16) void {
     const a = self.a;
-    const value = try self.bus.read(address);
+    const value = try self.console.read(address);
     const result = a | value;
 
     self.handleZeroFlagStatus(result);
@@ -431,7 +431,7 @@ fn ora(self: *Cpu, address: u16) void {
 
 fn eor(self: *Cpu, address: u16) void {
     const a = self.a;
-    const value = try self.bus.read(address);
+    const value = try self.console.read(address);
     const result = a ^ value;
 
     self.handleZeroFlagStatus(result);
@@ -471,25 +471,25 @@ fn dey(self: *Cpu) void {
 }
 
 fn inc(self: *Cpu, address: u16) void {
-    const value = try self.bus.read(address);
+    const value = try self.console.read(address);
     const result = value +% 1;
-    try self.bus.write(address, result);
+    try self.console.write(address, result);
 
     self.handleZeroFlagStatus(result);
     self.handleNegativeFlagStatus(result);
 }
 
 fn dec(self: *Cpu, address: u16) void {
-    const value = try self.bus.read(address);
+    const value = try self.console.read(address);
     const result = value -% 1;
-    try self.bus.write(address, result);
+    try self.console.write(address, result);
 
     self.handleZeroFlagStatus(result);
     self.handleNegativeFlagStatus(result);
 }
 
 fn cmp(self: *Cpu, address: u16) void {
-    const value = try self.bus.read(address);
+    const value = try self.console.read(address);
     const result = self.a -% value;
 
     self.status.carry = self.a >= value;
@@ -498,7 +498,7 @@ fn cmp(self: *Cpu, address: u16) void {
 }
 
 fn cpx(self: *Cpu, address: u16) void {
-    const value = try self.bus.read(address);
+    const value = try self.console.read(address);
     const result = self.x -% value;
 
     self.status.carry = self.x >= value;
@@ -507,7 +507,7 @@ fn cpx(self: *Cpu, address: u16) void {
 }
 
 fn cpy(self: *Cpu, address: u16) void {
-    const value = try self.bus.read(address);
+    const value = try self.console.read(address);
     const result = self.y -% value;
 
     self.status.carry = self.y >= value;
@@ -517,7 +517,7 @@ fn cpy(self: *Cpu, address: u16) void {
 
 fn bit(self: *Cpu, address: u16) void {
     const a = self.a;
-    const value = try self.bus.read(address);
+    const value = try self.console.read(address);
     const result = a & value;
 
     // For BIT, the zero flag is handled as normal but the overflow and negative
@@ -530,7 +530,7 @@ fn bit(self: *Cpu, address: u16) void {
 /// LSR allows the operand to either be a value in memory or the accumulator.
 /// Passing NULL as `address` will perform LSR on the accumulator.
 fn lsr(self: *Cpu, address: ?u16) void {
-    const value = if (address) |addr| try self.bus.read(addr) else self.a;
+    const value = if (address) |addr| try self.console.read(addr) else self.a;
     const shifted_bit = value & 1;
     const result = value >> 1;
 
@@ -539,7 +539,7 @@ fn lsr(self: *Cpu, address: ?u16) void {
     self.status.negative_result = false; // Since the 7th bit will always be 0 from SHL
 
     if (address) |addr| {
-        try self.bus.write(addr, result);
+        try self.console.write(addr, result);
     } else {
         self.a = result;
     }
@@ -548,7 +548,7 @@ fn lsr(self: *Cpu, address: ?u16) void {
 /// ASL allows the operand to either be a value in memory or the accumulator.
 /// Passing NULL as `address` will perform ASL on the accumulator.
 fn asl(self: *Cpu, address: ?u16) void {
-    const value = if (address) |addr| try self.bus.read(addr) else self.a;
+    const value = if (address) |addr| try self.console.read(addr) else self.a;
     const shifted_bit: u1 = if ((value & 0x80) == 0x80) 1 else 0;
     const result = value << 1;
 
@@ -557,14 +557,14 @@ fn asl(self: *Cpu, address: ?u16) void {
     self.handleNegativeFlagStatus(result);
 
     if (address) |addr| {
-        try self.bus.write(addr, result);
+        try self.console.write(addr, result);
     } else {
         self.a = result;
     }
 }
 
 fn rol(self: *Cpu, address: ?u16) void {
-    const value = if (address) |addr| try self.bus.read(addr) else self.a;
+    const value = if (address) |addr| try self.console.read(addr) else self.a;
     const shifted_bit: u1 = if ((value & 0x80) == 0x80) 1 else 0;
     const carry: u1 = if (self.status.carry) 1 else 0;
     const result = (value << 1) | carry;
@@ -574,14 +574,14 @@ fn rol(self: *Cpu, address: ?u16) void {
     self.handleNegativeFlagStatus(result);
 
     if (address) |addr| {
-        try self.bus.write(addr, result);
+        try self.console.write(addr, result);
     } else {
         self.a = result;
     }
 }
 
 fn ror(self: *Cpu, address: ?u16) void {
-    const value = if (address) |addr| try self.bus.read(addr) else self.a;
+    const value = if (address) |addr| try self.console.read(addr) else self.a;
     const shifted_bit = value & 1;
     const carry: u8 = if (self.status.carry) 0x80 else 0x00;
     const result = (value >> 1) | carry;
@@ -591,7 +591,7 @@ fn ror(self: *Cpu, address: ?u16) void {
     self.handleNegativeFlagStatus(result);
 
     if (address) |addr| {
-        try self.bus.write(addr, result);
+        try self.console.write(addr, result);
     } else {
         self.a = result;
     }
@@ -718,8 +718,8 @@ fn brk(self: *Cpu) !void {
     try self.stackPush(@truncate(self.pc & 0x00FF));
 
     // Read from the IRQ/BRK vector
-    const lo_byte = try self.bus.read(0xFFFE);
-    const hi_byte = try self.bus.read(0xFFFF);
+    const lo_byte = try self.console.read(0xFFFE);
+    const hi_byte = try self.console.read(0xFFFF);
     self.pc = makeWord(hi_byte, lo_byte);
 }
 
@@ -728,65 +728,65 @@ fn nop(self: *Cpu) void {
 }
 
 test "SEC" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
 
-    try bus.write(0x0000, 0x38);
+    try console.write(0x0000, 0x38);
     try cpu.step();
 
     try testing.expectEqual(cpu.status.carry, true);
 }
 
 test "CLC" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     cpu.status.carry = true;
 
-    try bus.write(0x0000, 0x18);
+    try console.write(0x0000, 0x18);
     try cpu.step();
 
     try testing.expectEqual(cpu.status.carry, false);
 }
 
 test "CLV" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     cpu.status.overflow = true;
 
-    try bus.write(0x0000, 0xB8);
+    try console.write(0x0000, 0xB8);
     try cpu.step();
 
     try testing.expectEqual(cpu.status.overflow, false);
 }
 
 test "SEI" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
 
-    try bus.write(0x0000, 0x78);
+    try console.write(0x0000, 0x78);
     try cpu.step();
 
     try testing.expectEqual(cpu.status.interrupt_disable, true);
 }
 
 test "CLI" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     cpu.status.interrupt_disable = true;
 
-    try bus.write(0x0000, 0x58);
+    try console.write(0x0000, 0x58);
     try cpu.step();
 
     try testing.expectEqual(cpu.status.interrupt_disable, false);
 }
 
 test "LDA Immediate" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
 
-    try bus.write(0x0000, 0xA9); // LDA Instruction
-    try bus.write(0x0001, expected_byte); // Operand
+    try console.write(0x0000, 0xA9); // LDA Instruction
+    try console.write(0x0001, expected_byte); // Operand
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.a);
@@ -795,26 +795,26 @@ test "LDA Immediate" {
 }
 
 test "LDA ZeroPage" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
 
-    try bus.write(0x0000, 0xA5); // LDA ZeroPage Instruction
-    try bus.write(0x0001, 0x06); // Operand
-    try bus.write(0x0006, expected_byte);
+    try console.write(0x0000, 0xA5); // LDA ZeroPage Instruction
+    try console.write(0x0001, 0x06); // Operand
+    try console.write(0x0006, expected_byte);
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.a);
 }
 
 test "LDA ZeroPage,X" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
 
-    try bus.write(0x0000, 0xB5); // LDA ZeroPage,X Instruction
-    try bus.write(0x0001, 0x06); // Operand
-    try bus.write(0x0007, expected_byte);
+    try console.write(0x0000, 0xB5); // LDA ZeroPage,X Instruction
+    try console.write(0x0001, 0x06); // Operand
+    try console.write(0x0007, expected_byte);
     cpu.x = 1; // X offset
     try cpu.step();
 
@@ -822,14 +822,14 @@ test "LDA ZeroPage,X" {
 }
 
 test "LDA Absolute" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
 
-    try bus.write(0x0000, 0xAD); // LDA Absolute Instruction
-    try bus.write(0x0001, 0x06); // Operand low byte
-    try bus.write(0x0002, 0xFF); // Operand high byte
-    try bus.write(0xFF06, expected_byte);
+    try console.write(0x0000, 0xAD); // LDA Absolute Instruction
+    try console.write(0x0001, 0x06); // Operand low byte
+    try console.write(0x0002, 0xFF); // Operand high byte
+    try console.write(0xFF06, expected_byte);
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.a);
@@ -837,14 +837,14 @@ test "LDA Absolute" {
 }
 
 test "LDA Absolute,X" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
 
-    try bus.write(0x0000, 0xBD); // LDA Absolute,X Instruction
-    try bus.write(0x0001, 0x06); // Operand low byte
-    try bus.write(0x0002, 0xFF); // Operand high byte
-    try bus.write(0xFF07, 0xFF);
+    try console.write(0x0000, 0xBD); // LDA Absolute,X Instruction
+    try console.write(0x0001, 0x06); // Operand low byte
+    try console.write(0x0002, 0xFF); // Operand high byte
+    try console.write(0xFF07, 0xFF);
     cpu.x = 1; // X index to be added to get the effective address
     try cpu.step();
 
@@ -853,15 +853,15 @@ test "LDA Absolute,X" {
 }
 
 test "LDA Absolute,X add additional cycle for crossing page boundaries" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
     cpu.x = 1; // X index to be added to get the effective address
 
-    try bus.write(0x0000, 0xBD); // LDA Absolute,X Instruction
-    try bus.write(0x0001, 0xFF); // Operand low byte
-    try bus.write(0x0002, 0xFE); // Operand high byte
-    try bus.write(0xFF00, 0xFF);
+    try console.write(0x0000, 0xBD); // LDA Absolute,X Instruction
+    try console.write(0x0001, 0xFF); // Operand low byte
+    try console.write(0x0002, 0xFE); // Operand high byte
+    try console.write(0xFF00, 0xFF);
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.a);
@@ -869,14 +869,14 @@ test "LDA Absolute,X add additional cycle for crossing page boundaries" {
 }
 
 test "LDA Absolute,Y" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
 
-    try bus.write(0x0000, 0xB9); // LDA Absolute,Y Instruction
-    try bus.write(0x0001, 0x06); // Operand low byte
-    try bus.write(0x0002, 0xFF); // Operand high byte
-    try bus.write(0xFF08, 0xFF);
+    try console.write(0x0000, 0xB9); // LDA Absolute,Y Instruction
+    try console.write(0x0001, 0x06); // Operand low byte
+    try console.write(0x0002, 0xFF); // Operand high byte
+    try console.write(0xFF08, 0xFF);
     cpu.y = 2; // Y index to be added to get the effective address
     try cpu.step();
 
@@ -884,17 +884,17 @@ test "LDA Absolute,Y" {
 }
 
 test "LDA IndexedIndirect" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
 
-    try bus.write(0x0000, 0xA1); // LDA IndirectIndexed Instruction
-    try bus.write(0x0001, 0x70); // Operand
+    try console.write(0x0000, 0xA1); // LDA IndirectIndexed Instruction
+    try console.write(0x0001, 0x70); // Operand
 
     // Contents at 0x0075 which contains the effective address
-    try bus.write(0x0075, 0x23); // Low Byte
-    try bus.write(0x0076, 0x30); // High Byte
-    try bus.write(0x3023, expected_byte);
+    try console.write(0x0075, 0x23); // Low Byte
+    try console.write(0x0076, 0x30); // High Byte
+    try console.write(0x3023, expected_byte);
     cpu.x = 0x05; // X value to be added to the effective address
     try cpu.step();
 
@@ -902,17 +902,17 @@ test "LDA IndexedIndirect" {
 }
 
 test "LDA IndirectIndexed" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
 
-    try bus.write(0x0000, 0xB1); // LDA IndirectIndexed Instruction
-    try bus.write(0x0001, 0x70); // Operand
+    try console.write(0x0000, 0xB1); // LDA IndirectIndexed Instruction
+    try console.write(0x0001, 0x70); // Operand
 
     // Contents at 0x0070 which contains the effective address
-    try bus.write(0x0070, 0x43); // Low Byte
-    try bus.write(0x0071, 0x35); // High Byte
-    try bus.write(0x3553, expected_byte);
+    try console.write(0x0070, 0x43); // Low Byte
+    try console.write(0x0071, 0x35); // High Byte
+    try console.write(0x3553, expected_byte);
     cpu.y = 0x10; // Y value to be added to the effective address
     try cpu.step();
 
@@ -920,13 +920,13 @@ test "LDA IndirectIndexed" {
 }
 
 test "LDX ZeroPage,Y" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
 
-    try bus.write(0x0000, 0xB6); // LDX ZeroPage,Y Instruction
-    try bus.write(0x0001, 0x06); // Operand
-    try bus.write(0x0007, expected_byte);
+    try console.write(0x0000, 0xB6); // LDX ZeroPage,Y Instruction
+    try console.write(0x0001, 0x06); // Operand
+    try console.write(0x0007, expected_byte);
     cpu.y = 1; // Y offset
     try cpu.step();
 
@@ -934,171 +934,171 @@ test "LDX ZeroPage,Y" {
 }
 
 test "LDY" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
 
-    try bus.write(0x0000, 0xAC); // LDY Absolute Instruction
-    try bus.write(0x0001, 0x06); // Operand low byte
-    try bus.write(0x0002, 0xFF); // Operand high byte
-    try bus.write(0xFF06, expected_byte);
+    try console.write(0x0000, 0xAC); // LDY Absolute Instruction
+    try console.write(0x0001, 0x06); // Operand low byte
+    try console.write(0x0002, 0xFF); // Operand high byte
+    try console.write(0xFF06, expected_byte);
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.y);
 }
 
 test "STA" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
     cpu.a = expected_byte;
 
-    try bus.write(0x0000, 0x8D); // STA Absolute Instruction
-    try bus.write(0x0001, 0x00);
-    try bus.write(0x0002, 0x10);
+    try console.write(0x0000, 0x8D); // STA Absolute Instruction
+    try console.write(0x0001, 0x00);
+    try console.write(0x0002, 0x10);
     try cpu.step();
 
-    try testing.expectEqual(expected_byte, try bus.read(0x1000));
+    try testing.expectEqual(expected_byte, try console.read(0x1000));
 }
 
 test "STX" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
     cpu.x = expected_byte;
 
-    try bus.write(0x0000, 0x8E); // STX Absolute Instruction
-    try bus.write(0x0001, 0x00);
-    try bus.write(0x0002, 0x10);
+    try console.write(0x0000, 0x8E); // STX Absolute Instruction
+    try console.write(0x0001, 0x00);
+    try console.write(0x0002, 0x10);
     try cpu.step();
 
-    try testing.expectEqual(expected_byte, try bus.read(0x1000));
+    try testing.expectEqual(expected_byte, try console.read(0x1000));
 }
 
 test "STY" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
     cpu.y = expected_byte;
 
-    try bus.write(0x0000, 0x8C); // STY Absolute Instruction
-    try bus.write(0x0001, 0x00);
-    try bus.write(0x0002, 0x10);
+    try console.write(0x0000, 0x8C); // STY Absolute Instruction
+    try console.write(0x0001, 0x00);
+    try console.write(0x0002, 0x10);
     try cpu.step();
 
-    try testing.expectEqual(expected_byte, try bus.read(0x1000));
+    try testing.expectEqual(expected_byte, try console.read(0x1000));
 }
 
 test "TAX" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
     cpu.a = expected_byte;
 
-    try bus.write(0x0000, 0xAA); // TAX Instruction
+    try console.write(0x0000, 0xAA); // TAX Instruction
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.x);
 }
 
 test "TAY" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
     cpu.a = expected_byte;
 
-    try bus.write(0x0000, 0xA8); // TAY Instruction
+    try console.write(0x0000, 0xA8); // TAY Instruction
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.y);
 }
 
 test "TXA" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
     cpu.x = expected_byte;
 
-    try bus.write(0x0000, 0x8A); // TXA Instruction
+    try console.write(0x0000, 0x8A); // TXA Instruction
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.a);
 }
 
 test "TYA" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
     cpu.y = expected_byte;
 
-    try bus.write(0x0000, 0x98); // TYA Instruction
+    try console.write(0x0000, 0x98); // TYA Instruction
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.a);
 }
 
 test "TXS" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
     cpu.x = 0xFF;
 
-    try bus.write(0x0000, 0x9A); // TXS Instruction
+    try console.write(0x0000, 0x9A); // TXS Instruction
     try cpu.step();
 
     try testing.expectEqual(expected_byte, try cpu.stackPop());
 }
 
 test "TSX" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
     try cpu.stackPush(expected_byte);
 
-    try bus.write(0x0000, 0xBA); // TSX Instruction
+    try console.write(0x0000, 0xBA); // TSX Instruction
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.x);
 }
 
 test "ADC Immediate" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_sum: u8 = 0xFF;
     cpu.a = 0xFE;
 
-    try bus.write(0x0000, 0x69); // ADC Immediate
-    try bus.write(0x0001, 0x01);
+    try console.write(0x0000, 0x69); // ADC Immediate
+    try console.write(0x0001, 0x01);
     try cpu.step();
 
     try testing.expectEqual(expected_sum, cpu.a);
 }
 
 test "ADC Add two signed integers" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_sum: u8 = 0x73; // +115 in hex
     cpu.a = 0xFB; // -5 in hex
 
-    try bus.write(0x0000, 0x6D); // ADC Absolute instruction
-    try bus.write(0x0001, 0x00);
-    try bus.write(0x0002, 0x10); // At address $1000
-    try bus.write(0x1000, 0x78); // +120 in hex
+    try console.write(0x0000, 0x6D); // ADC Absolute instruction
+    try console.write(0x0001, 0x00);
+    try console.write(0x0002, 0x10); // At address $1000
+    try console.write(0x1000, 0x78); // +120 in hex
     try cpu.step();
 
     try testing.expectEqual(expected_sum, cpu.a);
 }
 
 test "ADC signed addition with overflow" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_sum: u8 = 0x7B; // +123 in hex
     cpu.a = 0xFB; // -5 in hex
 
-    try bus.write(0x0000, 0x6D); // ADC Absolute instruction
-    try bus.write(0x0001, 0x00);
-    try bus.write(0x0002, 0x10); // At address $1000
-    try bus.write(0x1000, 0x80); // -128 in hex
+    try console.write(0x0000, 0x6D); // ADC Absolute instruction
+    try console.write(0x0001, 0x00);
+    try console.write(0x0002, 0x10); // At address $1000
+    try console.write(0x1000, 0x80); // -128 in hex
     try cpu.step();
 
     try testing.expectEqual(expected_sum, cpu.a);
@@ -1106,30 +1106,30 @@ test "ADC signed addition with overflow" {
 }
 
 test "SBC signed subtraction" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_sum: u8 = 0xFD; // -3 in hex
     cpu.a = 0xFE; // -2 in hex
 
-    try bus.write(0x0000, 0xED); // SBC Absolute instruction
-    try bus.write(0x0001, 0x00);
-    try bus.write(0x0002, 0x10); // At address $1000
-    try bus.write(0x1000, 0x01); // +1 in hex
+    try console.write(0x0000, 0xED); // SBC Absolute instruction
+    try console.write(0x0001, 0x00);
+    try console.write(0x0002, 0x10); // At address $1000
+    try console.write(0x1000, 0x01); // +1 in hex
     try cpu.step();
 
     try testing.expectEqual(expected_sum, cpu.a);
 }
 
 test "SBC signed subtraction with overflow" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_sum: u8 = 0x80; // -128 in hex
     cpu.a = 0x7F; // 127 in hex
 
-    try bus.write(0x0000, 0xED); // SBC Absolute instruction
-    try bus.write(0x0001, 0x00);
-    try bus.write(0x0002, 0x10); // At address $1000
-    try bus.write(0x1000, 0xFF); // -1 in hex
+    try console.write(0x0000, 0xED); // SBC Absolute instruction
+    try console.write(0x0001, 0x00);
+    try console.write(0x0002, 0x10); // At address $1000
+    try console.write(0x1000, 0xFF); // -1 in hex
     try cpu.step();
 
     try testing.expectEqual(expected_sum, cpu.a);
@@ -1137,12 +1137,12 @@ test "SBC signed subtraction with overflow" {
 }
 
 test "AND" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     cpu.a = 0x00;
 
-    try bus.write(0x0000, 0x29); // AND Immediate instruction
-    try bus.write(0x0001, 0x00);
+    try console.write(0x0000, 0x29); // AND Immediate instruction
+    try console.write(0x0001, 0x00);
     try cpu.step();
 
     try testing.expectEqual(true, cpu.status.zero_result);
@@ -1150,12 +1150,12 @@ test "AND" {
 }
 
 test "ORA" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     cpu.a = 0x01;
 
-    try bus.write(0x0000, 0x09); // ORA Immediate instruction
-    try bus.write(0x0001, 0x00);
+    try console.write(0x0000, 0x09); // ORA Immediate instruction
+    try console.write(0x0001, 0x00);
     try cpu.step();
 
     try testing.expectEqual(false, cpu.status.zero_result);
@@ -1163,12 +1163,12 @@ test "ORA" {
 }
 
 test "EOR" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     cpu.a = 0x01;
 
-    try bus.write(0x0000, 0x49); // EOR Immediate instruction
-    try bus.write(0x0001, 0x01);
+    try console.write(0x0000, 0x49); // EOR Immediate instruction
+    try console.write(0x0001, 0x01);
     try cpu.step();
 
     try testing.expectEqual(true, cpu.status.zero_result);
@@ -1176,47 +1176,47 @@ test "EOR" {
 }
 
 test "INX allows for overflow" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     cpu.x = 0xFF;
 
-    try bus.write(0x0000, 0xE8); // INX instruction
+    try console.write(0x0000, 0xE8); // INX instruction
     try cpu.step();
 
     try testing.expect(cpu.status.zero_result);
 }
 
 test "INY" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_value: u8 = 0x01;
     cpu.y = 0x00;
 
-    try bus.write(0x0000, 0xC8); // INY instruction
+    try console.write(0x0000, 0xC8); // INY instruction
     try cpu.step();
 
     try testing.expectEqual(expected_value, cpu.y);
 }
 
 test "DEX allows for overflow" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_value: u8 = 0xFF;
     cpu.x = 0x00;
 
-    try bus.write(0x0000, 0xCA); // DEX instruction
+    try console.write(0x0000, 0xCA); // DEX instruction
     try cpu.step();
 
     try testing.expectEqual(expected_value, cpu.x);
 }
 
 test "DEY allows for overflow" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_value: u8 = 0x00;
     cpu.y = 0x01;
 
-    try bus.write(0x0000, 0x88); // DEY instruction
+    try console.write(0x0000, 0x88); // DEY instruction
     try cpu.step();
 
     try testing.expectEqual(expected_value, cpu.y);
@@ -1224,40 +1224,40 @@ test "DEY allows for overflow" {
 }
 
 test "INC" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_value: u8 = 0x00;
 
-    try bus.write(0x0000, 0xE6); // INC ZeroPage instruction
-    try bus.write(0x0001, 0xFF);
-    try bus.write(0x00FF, 0xFF); // Value at ZeroPage $FF
+    try console.write(0x0000, 0xE6); // INC ZeroPage instruction
+    try console.write(0x0001, 0xFF);
+    try console.write(0x00FF, 0xFF); // Value at ZeroPage $FF
     try cpu.step();
 
-    try testing.expectEqual(expected_value, try bus.read(0x00FF));
+    try testing.expectEqual(expected_value, try console.read(0x00FF));
     try testing.expect(cpu.status.zero_result);
 }
 
 test "DEC" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_value: u8 = 0xFF;
 
-    try bus.write(0x0000, 0xCE); // DEC Absolute instruction
-    try bus.write(0x0001, 0xFF);
-    try bus.write(0x0002, 0x00);
-    try bus.write(0x00FF, 0x00); // Value at ZeroPage $FF
+    try console.write(0x0000, 0xCE); // DEC Absolute instruction
+    try console.write(0x0001, 0xFF);
+    try console.write(0x0002, 0x00);
+    try console.write(0x00FF, 0x00); // Value at ZeroPage $FF
     try cpu.step();
 
-    try testing.expectEqual(expected_value, try bus.read(0x00FF));
+    try testing.expectEqual(expected_value, try console.read(0x00FF));
 }
 
 test "CMP" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     cpu.a = 0xFF;
 
-    try bus.write(0x0000, 0xC9); // CMP Immediate instruction
-    try bus.write(0x0001, 0xFF);
+    try console.write(0x0000, 0xC9); // CMP Immediate instruction
+    try console.write(0x0001, 0xFF);
     try cpu.step();
 
     try testing.expect(cpu.status.carry);
@@ -1265,40 +1265,40 @@ test "CMP" {
 }
 
 test "CPX" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     cpu.x = 0x00;
 
-    try bus.write(0x0000, 0xE0); // CPX Immediate instruction
-    try bus.write(0x0001, 0xFF);
+    try console.write(0x0000, 0xE0); // CPX Immediate instruction
+    try console.write(0x0001, 0xFF);
     try cpu.step();
 
     try testing.expect(!cpu.status.carry);
 }
 
 test "CPY" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     cpu.y = 0x10;
 
-    try bus.write(0x0000, 0xCC); // CPY Absolute instruction
-    try bus.write(0x0001, 0x00);
-    try bus.write(0x0002, 0x01);
-    try bus.write(0x0100, 0x0F);
+    try console.write(0x0000, 0xCC); // CPY Absolute instruction
+    try console.write(0x0001, 0x00);
+    try console.write(0x0002, 0x01);
+    try console.write(0x0100, 0x0F);
     try cpu.step();
 
     try testing.expect(cpu.status.carry);
 }
 
 test "BIT" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     cpu.a = 0x02;
 
-    try bus.write(0x0000, 0x2C); // BIT Absolute Instruction
-    try bus.write(0x0001, 0x01);
-    try bus.write(0x0002, 0x0C);
-    try bus.write(0x0C01, 0x8F);
+    try console.write(0x0000, 0x2C); // BIT Absolute Instruction
+    try console.write(0x0001, 0x01);
+    try console.write(0x0002, 0x0C);
+    try console.write(0x0C01, 0x8F);
     try cpu.step();
 
     try testing.expect(cpu.status.negative_result);
@@ -1307,12 +1307,12 @@ test "BIT" {
 }
 
 test "LSR" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0x7F;
     cpu.a = 0xFF;
 
-    try bus.write(0x0000, 0x4A); // LSR Accumulator Instruction
+    try console.write(0x0000, 0x4A); // LSR Accumulator Instruction
     try cpu.step();
 
     try testing.expect(!cpu.status.zero_result);
@@ -1322,12 +1322,12 @@ test "LSR" {
 }
 
 test "LSR Zero Flag is set if the result is zero" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0x00;
     cpu.a = 0x01;
 
-    try bus.write(0x0000, 0x4A); // LSR Accumulator Instruction
+    try console.write(0x0000, 0x4A); // LSR Accumulator Instruction
     try cpu.step();
 
     try testing.expect(cpu.status.zero_result);
@@ -1337,12 +1337,12 @@ test "LSR Zero Flag is set if the result is zero" {
 }
 
 test "ASL" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0x00;
     cpu.a = 0x80;
 
-    try bus.write(0x0000, 0x0A); // ASL Accumulator Instruction
+    try console.write(0x0000, 0x0A); // ASL Accumulator Instruction
     try cpu.step();
 
     try testing.expect(cpu.status.zero_result);
@@ -1352,12 +1352,12 @@ test "ASL" {
 }
 
 test "ROL" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0x80;
     cpu.a = 0xC0;
 
-    try bus.write(0x0000, 0x2A); // ROL Accumulator Instruction
+    try console.write(0x0000, 0x2A); // ROL Accumulator Instruction
     try cpu.step();
 
     try testing.expect(!cpu.status.zero_result);
@@ -1366,71 +1366,71 @@ test "ROL" {
 }
 
 test "ROR" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0x81;
     cpu.status.carry = true;
 
-    try bus.write(0x0000, 0x66); // ROR Zeropage Instruction
-    try bus.write(0x0001, 0xFF);
-    try bus.write(0x00FF, 0x02);
+    try console.write(0x0000, 0x66); // ROR Zeropage Instruction
+    try console.write(0x0001, 0xFF);
+    try console.write(0x00FF, 0x02);
     try cpu.step();
 
     try testing.expect(!cpu.status.zero_result);
     try testing.expect(!cpu.status.carry);
-    try testing.expectEqual(expected_byte, try bus.read(0x00FF));
+    try testing.expectEqual(expected_byte, try console.read(0x00FF));
 }
 
 test "JMP Absolute" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_pc: u16 = 0x4030;
 
-    try bus.write(0x0000, 0x4C); // JMP Absolute
-    try bus.write(0x0001, 0x30);
-    try bus.write(0x0002, 0x40);
+    try console.write(0x0000, 0x4C); // JMP Absolute
+    try console.write(0x0001, 0x30);
+    try console.write(0x0002, 0x40);
     try cpu.step();
 
     try testing.expectEqual(expected_pc, cpu.pc);
 }
 
 test "JMP Indirect" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_pc: u16 = 0x2010;
 
-    try bus.write(0x0000, 0x6C); // JMP Indirect
-    try bus.write(0x0001, 0x30); // Indirect low byte
-    try bus.write(0x0002, 0x40); // Indirect high byte
-    try bus.write(0x4030, 0x10);
-    try bus.write(0x4031, 0x20);
+    try console.write(0x0000, 0x6C); // JMP Indirect
+    try console.write(0x0001, 0x30); // Indirect low byte
+    try console.write(0x0002, 0x40); // Indirect high byte
+    try console.write(0x4030, 0x10);
+    try console.write(0x4031, 0x20);
     try cpu.step();
 
     try testing.expectEqual(expected_pc, cpu.pc);
 }
 
 test "BMI" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_address: u16 = 0x0081;
     cpu.status.negative_result = true;
 
-    try bus.write(0x0000, 0x30); // BMI Instruction
-    try bus.write(0x0001, 0x7F);
+    try console.write(0x0000, 0x30); // BMI Instruction
+    try console.write(0x0001, 0x7F);
     try cpu.step();
 
     try testing.expectEqual(expected_address, cpu.pc);
 }
 
 test "BMI branching adds an additional cycle" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_address: u16 = 0x0080;
     cpu.pc = 0x000E;
     cpu.status.negative_result = true;
 
-    try bus.write(0x000E, 0x30); // BMI Instruction
-    try bus.write(0x000F, 0x70);
+    try console.write(0x000E, 0x30); // BMI Instruction
+    try console.write(0x000F, 0x70);
     try cpu.step();
 
     try testing.expectEqual(expected_address, cpu.pc);
@@ -1438,14 +1438,14 @@ test "BMI branching adds an additional cycle" {
 }
 
 test "BMI branching with a page boundary adds two additional cycles" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_address: u16 = 0x0100;
     cpu.pc = 0x00EE;
     cpu.status.negative_result = true;
 
-    try bus.write(0x00EE, 0x30); // BMI Instruction
-    try bus.write(0x00EF, 0x10);
+    try console.write(0x00EE, 0x30); // BMI Instruction
+    try console.write(0x00EF, 0x10);
     try cpu.step();
 
     try testing.expectEqual(expected_address, cpu.pc);
@@ -1453,105 +1453,105 @@ test "BMI branching with a page boundary adds two additional cycles" {
 }
 
 test "BPL" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_address: u16 = 0x0005;
     cpu.status.negative_result = true;
 
-    try bus.write(0x0000, 0x30); // BPL Instruction
-    try bus.write(0x0001, 0x03);
+    try console.write(0x0000, 0x30); // BPL Instruction
+    try console.write(0x0001, 0x03);
     try cpu.step();
 
     try testing.expectEqual(expected_address, cpu.pc);
 }
 
 test "BVS" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_address: u16 = 0x0005;
     cpu.status.overflow = true;
 
-    try bus.write(0x0000, 0x70); // BVS Instruction
-    try bus.write(0x0001, 0x03);
+    try console.write(0x0000, 0x70); // BVS Instruction
+    try console.write(0x0001, 0x03);
     try cpu.step();
 
     try testing.expectEqual(expected_address, cpu.pc);
 }
 
 test "BVC" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_address: u16 = 0x0005;
     cpu.status.overflow = false;
 
-    try bus.write(0x0000, 0x50); // BVC Instruction
-    try bus.write(0x0001, 0x03);
+    try console.write(0x0000, 0x50); // BVC Instruction
+    try console.write(0x0001, 0x03);
     try cpu.step();
 
     try testing.expectEqual(expected_address, cpu.pc);
 }
 
 test "BCS" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_address: u16 = 0x0005;
     cpu.status.carry = true;
 
-    try bus.write(0x0000, 0xB0); // BCS Instruction
-    try bus.write(0x0001, 0x03);
+    try console.write(0x0000, 0xB0); // BCS Instruction
+    try console.write(0x0001, 0x03);
     try cpu.step();
 
     try testing.expectEqual(expected_address, cpu.pc);
 }
 
 test "BCC" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_address: u16 = 0x0005;
     cpu.status.carry = false;
 
-    try bus.write(0x0000, 0x90); // BCC Instruction
-    try bus.write(0x0001, 0x03);
+    try console.write(0x0000, 0x90); // BCC Instruction
+    try console.write(0x0001, 0x03);
     try cpu.step();
 
     try testing.expectEqual(expected_address, cpu.pc);
 }
 
 test "BEQ" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_address: u16 = 0x0005;
     cpu.status.zero_result = true;
 
-    try bus.write(0x0000, 0xF0); // BEQ Instruction
-    try bus.write(0x0001, 0x03);
+    try console.write(0x0000, 0xF0); // BEQ Instruction
+    try console.write(0x0001, 0x03);
     try cpu.step();
 
     try testing.expectEqual(expected_address, cpu.pc);
 }
 
 test "BNE" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_address: u16 = 0x0005;
     cpu.status.zero_result = false;
 
-    try bus.write(0x0000, 0xD0); // BNE Instruction
-    try bus.write(0x0001, 0x03);
+    try console.write(0x0000, 0xD0); // BNE Instruction
+    try console.write(0x0001, 0x03);
     try cpu.step();
 
     try testing.expectEqual(expected_address, cpu.pc);
 }
 
 test "JSR" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_address: u16 = 0x3000;
     cpu.pc = 0x1000;
 
-    try bus.write(0x1000, 0x20); // JSR Instruction
-    try bus.write(0x1001, 0x00);
-    try bus.write(0x1002, 0x30);
+    try console.write(0x1000, 0x20); // JSR Instruction
+    try console.write(0x1001, 0x00);
+    try console.write(0x1002, 0x30);
     try cpu.step();
 
     try testing.expectEqual(expected_address, cpu.pc);
@@ -1564,61 +1564,61 @@ test "JSR" {
 }
 
 test "RTS" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_address: u16 = 0x1000;
     try cpu.stackPush(0x10);
     try cpu.stackPush(0x00);
 
-    try bus.write(0x0000, 0x60); // RTS Instruction
+    try console.write(0x0000, 0x60); // RTS Instruction
     try cpu.step();
 
     try testing.expectEqual(expected_address, cpu.pc);
 }
 
 test "PHA" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
     cpu.a = 0xFF;
 
-    try bus.write(0x0000, 0x48); // PHA Instruction
+    try console.write(0x0000, 0x48); // PHA Instruction
     try cpu.step();
 
     try testing.expectEqual(expected_byte, try cpu.stackPop());
 }
 
 test "PHP" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0x01;
     cpu.status.carry = true;
 
-    try bus.write(0x0000, 0x08); // PHP Instruction
+    try console.write(0x0000, 0x08); // PHP Instruction
     try cpu.step();
 
     try testing.expectEqual(expected_byte, try cpu.stackPop());
 }
 
 test "PLA" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
     try cpu.stackPush(expected_byte);
 
-    try bus.write(0x0000, 0x68); // PLA Instruction
+    try console.write(0x0000, 0x68); // PLA Instruction
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.a);
 }
 
 test "PLP" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_byte: u8 = 0x03;
     try cpu.stackPush(expected_byte);
 
-    try bus.write(0x0000, 0x28); // PLP Instruction
+    try console.write(0x0000, 0x28); // PLP Instruction
     try cpu.step();
 
     try testing.expectEqual(expected_byte, @as(u8, @bitCast(cpu.status)));
@@ -1632,15 +1632,15 @@ test "PLP" {
 }
 
 test "RTI" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_stack_reg: u8 = 0x03;
     const expected_address: u16 = 0x1000;
     try cpu.stackPush(0x10); // First push the address in little endian
     try cpu.stackPush(0x00);
     try cpu.stackPush(0x03); // Next push the status register
 
-    try bus.write(0x0000, 0x40); // RTI Instruction
+    try console.write(0x0000, 0x40); // RTI Instruction
     try cpu.step();
 
     try testing.expectEqual(expected_stack_reg, @as(u8, @bitCast(cpu.status)));
@@ -1648,25 +1648,25 @@ test "RTI" {
 }
 
 test "BRK" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_address: u16 = 0x0100;
     cpu.status.negative_result = true;
 
-    try bus.write(0x0000, 0x00); // BRK Instruction
-    try bus.write(0xFFFE, 0x00); // Set the IRQ/BRK vector
-    try bus.write(0xFFFF, 0x01);
+    try console.write(0x0000, 0x00); // BRK Instruction
+    try console.write(0xFFFE, 0x00); // Set the IRQ/BRK vector
+    try console.write(0xFFFF, 0x01);
     try cpu.step();
 
     try testing.expectEqual(expected_address, cpu.pc);
 }
 
 test "NOP" {
-    var bus = Bus{};
-    var cpu = Cpu.init(&bus);
+    var console = Console{};
+    var cpu = Cpu.init(&console);
     const expected_address: u16 = 0x0001;
 
-    try bus.write(0x0000, 0xEA); // NOP Instruction
+    try console.write(0x0000, 0xEA); // NOP Instruction
     try cpu.step();
 
     try testing.expectEqual(expected_address, cpu.pc);
