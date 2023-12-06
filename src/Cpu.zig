@@ -30,7 +30,7 @@ status: packed struct(u8) {
     negative_result: bool = false,
 } = .{},
 
-pub fn init(console: *Console) Cpu {
+pub fn init(console: *Console) !Cpu {
     var cpu = Cpu{
         .console = console,
     };
@@ -38,9 +38,12 @@ pub fn init(console: *Console) Cpu {
     console.connectCpu(&cpu);
 
     // Read from the reset vector to init the PC
-    const lo_byte = try console.read(0xFFFC);
-    const hi_byte = try console.read(0xFFFD);
-    cpu.pc = makeWord(hi_byte, lo_byte);
+    // if the console has a cartridge connected.
+    if (console.cartridge) |_| {
+        const lo_byte = try console.read(0xFFFC);
+        const hi_byte = try console.read(0xFFFD);
+        cpu.pc = makeWord(hi_byte, lo_byte);
+    }
 
     return cpu;
 }
@@ -198,37 +201,37 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .CLV => self.clv(),
         .SEI => self.sei(),
         .CLI => self.cli(),
-        .LDA => self.lda(address.?),
-        .LDX => self.ldx(address.?),
-        .LDY => self.ldy(address.?),
-        .STA => self.sta(address.?),
-        .STX => self.stx(address.?),
-        .STY => self.sty(address.?),
+        .LDA => try self.lda(address.?),
+        .LDX => try self.ldx(address.?),
+        .LDY => try self.ldy(address.?),
+        .STA => try self.sta(address.?),
+        .STX => try self.stx(address.?),
+        .STY => try self.sty(address.?),
         .TAX => self.tax(),
         .TAY => self.tay(),
         .TXA => self.txa(),
         .TYA => self.tya(),
         .TXS => try self.txs(),
         .TSX => try self.tsx(),
-        .ADC => self.adc(address.?),
-        .SBC => self.sbc(address.?),
-        .AND => self.aand(address.?),
-        .ORA => self.ora(address.?),
-        .EOR => self.eor(address.?),
+        .ADC => try self.adc(address.?),
+        .SBC => try self.sbc(address.?),
+        .AND => try self.aand(address.?),
+        .ORA => try self.ora(address.?),
+        .EOR => try self.eor(address.?),
         .INX => self.inx(),
         .INY => self.iny(),
         .DEX => self.dex(),
         .DEY => self.dey(),
-        .INC => self.inc(address.?),
-        .DEC => self.dec(address.?),
-        .CMP => self.cmp(address.?),
-        .CPX => self.cpx(address.?),
-        .CPY => self.cpy(address.?),
-        .BIT => self.bit(address.?),
-        .LSR => self.lsr(address),
-        .ASL => self.asl(address),
-        .ROL => self.rol(address),
-        .ROR => self.ror(address),
+        .INC => try self.inc(address.?),
+        .DEC => try self.dec(address.?),
+        .CMP => try self.cmp(address.?),
+        .CPX => try self.cpx(address.?),
+        .CPY => try self.cpy(address.?),
+        .BIT => try self.bit(address.?),
+        .LSR => try self.lsr(address),
+        .ASL => try self.asl(address),
+        .ROL => try self.rol(address),
+        .ROR => try self.ror(address),
         .JMP => self.jmp(address.?),
         .BMI => self.bmi(address.?, &additional_cycles), // Branching instructions add a cycle if branching occurs.
         .BPL => self.bpl(address.?, &additional_cycles), // If no branching occurs, then the additional_cycles are
@@ -281,7 +284,7 @@ fn cli(self: *Cpu) void {
     self.status.interrupt_disable = false;
 }
 
-fn lda(self: *Cpu, address: u16) void {
+fn lda(self: *Cpu, address: u16) !void {
     const value = try self.console.read(address);
     self.a = value;
 
@@ -289,7 +292,7 @@ fn lda(self: *Cpu, address: u16) void {
     self.handleNegativeFlagStatus(value);
 }
 
-fn ldx(self: *Cpu, address: u16) void {
+fn ldx(self: *Cpu, address: u16) !void {
     const value = try self.console.read(address);
     self.x = value;
 
@@ -297,7 +300,7 @@ fn ldx(self: *Cpu, address: u16) void {
     self.handleNegativeFlagStatus(value);
 }
 
-fn ldy(self: *Cpu, address: u16) void {
+fn ldy(self: *Cpu, address: u16) !void {
     const value = try self.console.read(address);
     self.y = value;
 
@@ -305,15 +308,15 @@ fn ldy(self: *Cpu, address: u16) void {
     self.handleNegativeFlagStatus(value);
 }
 
-fn sta(self: *Cpu, address: u16) void {
+fn sta(self: *Cpu, address: u16) !void {
     try self.console.write(address, self.a);
 }
 
-fn stx(self: *Cpu, address: u16) void {
+fn stx(self: *Cpu, address: u16) !void {
     try self.console.write(address, self.x);
 }
 
-fn sty(self: *Cpu, address: u16) void {
+fn sty(self: *Cpu, address: u16) !void {
     try self.console.write(address, self.y);
 }
 
@@ -361,7 +364,7 @@ fn tsx(self: *Cpu) !void {
 /// ADC is kind of a pain. It adds three values together: (1) the accumulator,
 /// (2) the byte specified by the operand, and (3) the carry flag. The result
 /// of the operation is stored in the accumulator.
-fn adc(self: *Cpu, address: u16) void {
+fn adc(self: *Cpu, address: u16) !void {
     const a = self.a;
     const value = try self.console.read(address);
 
@@ -388,7 +391,7 @@ fn adc(self: *Cpu, address: u16) void {
     self.handleNegativeFlagStatus(result);
 }
 
-fn sbc(self: *Cpu, address: u16) void {
+fn sbc(self: *Cpu, address: u16) !void {
     const a = self.a;
     const value = try self.console.read(address);
 
@@ -411,7 +414,7 @@ fn sbc(self: *Cpu, address: u16) void {
     self.handleNegativeFlagStatus(result);
 }
 
-fn aand(self: *Cpu, address: u16) void {
+fn aand(self: *Cpu, address: u16) !void {
     const a = self.a;
     const value = try self.console.read(address);
     const result = a & value;
@@ -420,7 +423,7 @@ fn aand(self: *Cpu, address: u16) void {
     self.handleNegativeFlagStatus(result);
 }
 
-fn ora(self: *Cpu, address: u16) void {
+fn ora(self: *Cpu, address: u16) !void {
     const a = self.a;
     const value = try self.console.read(address);
     const result = a | value;
@@ -429,7 +432,7 @@ fn ora(self: *Cpu, address: u16) void {
     self.handleNegativeFlagStatus(result);
 }
 
-fn eor(self: *Cpu, address: u16) void {
+fn eor(self: *Cpu, address: u16) !void {
     const a = self.a;
     const value = try self.console.read(address);
     const result = a ^ value;
@@ -470,7 +473,7 @@ fn dey(self: *Cpu) void {
     self.handleNegativeFlagStatus(result);
 }
 
-fn inc(self: *Cpu, address: u16) void {
+fn inc(self: *Cpu, address: u16) !void {
     const value = try self.console.read(address);
     const result = value +% 1;
     try self.console.write(address, result);
@@ -479,7 +482,7 @@ fn inc(self: *Cpu, address: u16) void {
     self.handleNegativeFlagStatus(result);
 }
 
-fn dec(self: *Cpu, address: u16) void {
+fn dec(self: *Cpu, address: u16) !void {
     const value = try self.console.read(address);
     const result = value -% 1;
     try self.console.write(address, result);
@@ -488,7 +491,7 @@ fn dec(self: *Cpu, address: u16) void {
     self.handleNegativeFlagStatus(result);
 }
 
-fn cmp(self: *Cpu, address: u16) void {
+fn cmp(self: *Cpu, address: u16) !void {
     const value = try self.console.read(address);
     const result = self.a -% value;
 
@@ -497,7 +500,7 @@ fn cmp(self: *Cpu, address: u16) void {
     self.handleNegativeFlagStatus(result);
 }
 
-fn cpx(self: *Cpu, address: u16) void {
+fn cpx(self: *Cpu, address: u16) !void {
     const value = try self.console.read(address);
     const result = self.x -% value;
 
@@ -506,7 +509,7 @@ fn cpx(self: *Cpu, address: u16) void {
     self.handleNegativeFlagStatus(result);
 }
 
-fn cpy(self: *Cpu, address: u16) void {
+fn cpy(self: *Cpu, address: u16) !void {
     const value = try self.console.read(address);
     const result = self.y -% value;
 
@@ -515,7 +518,7 @@ fn cpy(self: *Cpu, address: u16) void {
     self.handleNegativeFlagStatus(result);
 }
 
-fn bit(self: *Cpu, address: u16) void {
+fn bit(self: *Cpu, address: u16) !void {
     const a = self.a;
     const value = try self.console.read(address);
     const result = a & value;
@@ -529,7 +532,7 @@ fn bit(self: *Cpu, address: u16) void {
 
 /// LSR allows the operand to either be a value in memory or the accumulator.
 /// Passing NULL as `address` will perform LSR on the accumulator.
-fn lsr(self: *Cpu, address: ?u16) void {
+fn lsr(self: *Cpu, address: ?u16) !void {
     const value = if (address) |addr| try self.console.read(addr) else self.a;
     const shifted_bit = value & 1;
     const result = value >> 1;
@@ -547,7 +550,7 @@ fn lsr(self: *Cpu, address: ?u16) void {
 
 /// ASL allows the operand to either be a value in memory or the accumulator.
 /// Passing NULL as `address` will perform ASL on the accumulator.
-fn asl(self: *Cpu, address: ?u16) void {
+fn asl(self: *Cpu, address: ?u16) !void {
     const value = if (address) |addr| try self.console.read(addr) else self.a;
     const shifted_bit: u1 = if ((value & 0x80) == 0x80) 1 else 0;
     const result = value << 1;
@@ -563,7 +566,7 @@ fn asl(self: *Cpu, address: ?u16) void {
     }
 }
 
-fn rol(self: *Cpu, address: ?u16) void {
+fn rol(self: *Cpu, address: ?u16) !void {
     const value = if (address) |addr| try self.console.read(addr) else self.a;
     const shifted_bit: u1 = if ((value & 0x80) == 0x80) 1 else 0;
     const carry: u1 = if (self.status.carry) 1 else 0;
@@ -580,7 +583,7 @@ fn rol(self: *Cpu, address: ?u16) void {
     }
 }
 
-fn ror(self: *Cpu, address: ?u16) void {
+fn ror(self: *Cpu, address: ?u16) !void {
     const value = if (address) |addr| try self.console.read(addr) else self.a;
     const shifted_bit = value & 1;
     const carry: u8 = if (self.status.carry) 0x80 else 0x00;
@@ -729,7 +732,7 @@ fn nop(self: *Cpu) void {
 
 test "SEC" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
 
     try console.write(0x0000, 0x38);
     try cpu.step();
@@ -739,7 +742,7 @@ test "SEC" {
 
 test "CLC" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     cpu.status.carry = true;
 
     try console.write(0x0000, 0x18);
@@ -750,7 +753,7 @@ test "CLC" {
 
 test "CLV" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     cpu.status.overflow = true;
 
     try console.write(0x0000, 0xB8);
@@ -761,7 +764,7 @@ test "CLV" {
 
 test "SEI" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
 
     try console.write(0x0000, 0x78);
     try cpu.step();
@@ -771,7 +774,7 @@ test "SEI" {
 
 test "CLI" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     cpu.status.interrupt_disable = true;
 
     try console.write(0x0000, 0x58);
@@ -782,7 +785,7 @@ test "CLI" {
 
 test "LDA Immediate" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
 
     try console.write(0x0000, 0xA9); // LDA Instruction
@@ -796,7 +799,7 @@ test "LDA Immediate" {
 
 test "LDA ZeroPage" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
 
     try console.write(0x0000, 0xA5); // LDA ZeroPage Instruction
@@ -809,7 +812,7 @@ test "LDA ZeroPage" {
 
 test "LDA ZeroPage,X" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
 
     try console.write(0x0000, 0xB5); // LDA ZeroPage,X Instruction
@@ -823,13 +826,13 @@ test "LDA ZeroPage,X" {
 
 test "LDA Absolute" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
 
     try console.write(0x0000, 0xAD); // LDA Absolute Instruction
-    try console.write(0x0001, 0x06); // Operand low byte
-    try console.write(0x0002, 0xFF); // Operand high byte
-    try console.write(0xFF06, expected_byte);
+    try console.write(0x0001, 0xFF); // Operand low byte
+    try console.write(0x0002, 0x01); // Operand high byte
+    try console.write(0x01FF, expected_byte);
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.a);
@@ -838,13 +841,13 @@ test "LDA Absolute" {
 
 test "LDA Absolute,X" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
 
     try console.write(0x0000, 0xBD); // LDA Absolute,X Instruction
-    try console.write(0x0001, 0x06); // Operand low byte
-    try console.write(0x0002, 0xFF); // Operand high byte
-    try console.write(0xFF07, 0xFF);
+    try console.write(0x0001, 0xFE); // Operand low byte
+    try console.write(0x0002, 0x01); // Operand high byte
+    try console.write(0x01FF, 0xFF);
     cpu.x = 1; // X index to be added to get the effective address
     try cpu.step();
 
@@ -854,14 +857,14 @@ test "LDA Absolute,X" {
 
 test "LDA Absolute,X add additional cycle for crossing page boundaries" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
     cpu.x = 1; // X index to be added to get the effective address
 
     try console.write(0x0000, 0xBD); // LDA Absolute,X Instruction
     try console.write(0x0001, 0xFF); // Operand low byte
-    try console.write(0x0002, 0xFE); // Operand high byte
-    try console.write(0xFF00, 0xFF);
+    try console.write(0x0002, 0x00); // Operand high byte
+    try console.write(0x0100, 0xFF);
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.a);
@@ -870,13 +873,13 @@ test "LDA Absolute,X add additional cycle for crossing page boundaries" {
 
 test "LDA Absolute,Y" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
 
     try console.write(0x0000, 0xB9); // LDA Absolute,Y Instruction
-    try console.write(0x0001, 0x06); // Operand low byte
-    try console.write(0x0002, 0xFF); // Operand high byte
-    try console.write(0xFF08, 0xFF);
+    try console.write(0x0001, 0xFD); // Operand low byte
+    try console.write(0x0002, 0x01); // Operand high byte
+    try console.write(0x01FF, 0xFF);
     cpu.y = 2; // Y index to be added to get the effective address
     try cpu.step();
 
@@ -885,16 +888,16 @@ test "LDA Absolute,Y" {
 
 test "LDA IndexedIndirect" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
 
     try console.write(0x0000, 0xA1); // LDA IndirectIndexed Instruction
     try console.write(0x0001, 0x70); // Operand
 
     // Contents at 0x0075 which contains the effective address
-    try console.write(0x0075, 0x23); // Low Byte
-    try console.write(0x0076, 0x30); // High Byte
-    try console.write(0x3023, expected_byte);
+    try console.write(0x0075, 0xFF); // Low Byte
+    try console.write(0x0076, 0x01); // High Byte
+    try console.write(0x01FF, expected_byte);
     cpu.x = 0x05; // X value to be added to the effective address
     try cpu.step();
 
@@ -903,16 +906,16 @@ test "LDA IndexedIndirect" {
 
 test "LDA IndirectIndexed" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
 
     try console.write(0x0000, 0xB1); // LDA IndirectIndexed Instruction
     try console.write(0x0001, 0x70); // Operand
 
     // Contents at 0x0070 which contains the effective address
-    try console.write(0x0070, 0x43); // Low Byte
-    try console.write(0x0071, 0x35); // High Byte
-    try console.write(0x3553, expected_byte);
+    try console.write(0x0070, 0xEF); // Low Byte
+    try console.write(0x0071, 0x01); // High Byte
+    try console.write(0x01FF, expected_byte);
     cpu.y = 0x10; // Y value to be added to the effective address
     try cpu.step();
 
@@ -921,7 +924,7 @@ test "LDA IndirectIndexed" {
 
 test "LDX ZeroPage,Y" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
 
     try console.write(0x0000, 0xB6); // LDX ZeroPage,Y Instruction
@@ -935,13 +938,13 @@ test "LDX ZeroPage,Y" {
 
 test "LDY" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
 
     try console.write(0x0000, 0xAC); // LDY Absolute Instruction
-    try console.write(0x0001, 0x06); // Operand low byte
-    try console.write(0x0002, 0xFF); // Operand high byte
-    try console.write(0xFF06, expected_byte);
+    try console.write(0x0001, 0xFF); // Operand low byte
+    try console.write(0x0002, 0x01); // Operand high byte
+    try console.write(0x01FF, expected_byte);
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.y);
@@ -949,7 +952,7 @@ test "LDY" {
 
 test "STA" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
     cpu.a = expected_byte;
 
@@ -963,7 +966,7 @@ test "STA" {
 
 test "STX" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
     cpu.x = expected_byte;
 
@@ -977,7 +980,7 @@ test "STX" {
 
 test "STY" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
     cpu.y = expected_byte;
 
@@ -991,7 +994,7 @@ test "STY" {
 
 test "TAX" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
     cpu.a = expected_byte;
 
@@ -1003,7 +1006,7 @@ test "TAX" {
 
 test "TAY" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
     cpu.a = expected_byte;
 
@@ -1015,7 +1018,7 @@ test "TAY" {
 
 test "TXA" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
     cpu.x = expected_byte;
 
@@ -1027,7 +1030,7 @@ test "TXA" {
 
 test "TYA" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
     cpu.y = expected_byte;
 
@@ -1039,7 +1042,7 @@ test "TYA" {
 
 test "TXS" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
     cpu.x = 0xFF;
 
@@ -1051,7 +1054,7 @@ test "TXS" {
 
 test "TSX" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
     try cpu.stackPush(expected_byte);
 
@@ -1063,7 +1066,7 @@ test "TSX" {
 
 test "ADC Immediate" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_sum: u8 = 0xFF;
     cpu.a = 0xFE;
 
@@ -1076,14 +1079,14 @@ test "ADC Immediate" {
 
 test "ADC Add two signed integers" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_sum: u8 = 0x73; // +115 in hex
     cpu.a = 0xFB; // -5 in hex
 
     try console.write(0x0000, 0x6D); // ADC Absolute instruction
     try console.write(0x0001, 0x00);
-    try console.write(0x0002, 0x10); // At address $1000
-    try console.write(0x1000, 0x78); // +120 in hex
+    try console.write(0x0002, 0x01); // At address $0100
+    try console.write(0x0100, 0x78); // +120 in hex
     try cpu.step();
 
     try testing.expectEqual(expected_sum, cpu.a);
@@ -1091,14 +1094,14 @@ test "ADC Add two signed integers" {
 
 test "ADC signed addition with overflow" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_sum: u8 = 0x7B; // +123 in hex
     cpu.a = 0xFB; // -5 in hex
 
     try console.write(0x0000, 0x6D); // ADC Absolute instruction
     try console.write(0x0001, 0x00);
-    try console.write(0x0002, 0x10); // At address $1000
-    try console.write(0x1000, 0x80); // -128 in hex
+    try console.write(0x0002, 0x01); // At address $0100
+    try console.write(0x0100, 0x80); // -128 in hex
     try cpu.step();
 
     try testing.expectEqual(expected_sum, cpu.a);
@@ -1107,14 +1110,14 @@ test "ADC signed addition with overflow" {
 
 test "SBC signed subtraction" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_sum: u8 = 0xFD; // -3 in hex
     cpu.a = 0xFE; // -2 in hex
 
     try console.write(0x0000, 0xED); // SBC Absolute instruction
     try console.write(0x0001, 0x00);
-    try console.write(0x0002, 0x10); // At address $1000
-    try console.write(0x1000, 0x01); // +1 in hex
+    try console.write(0x0002, 0x01); // At address $0100
+    try console.write(0x0100, 0x01); // +1 in hex
     try cpu.step();
 
     try testing.expectEqual(expected_sum, cpu.a);
@@ -1122,14 +1125,14 @@ test "SBC signed subtraction" {
 
 test "SBC signed subtraction with overflow" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_sum: u8 = 0x80; // -128 in hex
     cpu.a = 0x7F; // 127 in hex
 
     try console.write(0x0000, 0xED); // SBC Absolute instruction
     try console.write(0x0001, 0x00);
-    try console.write(0x0002, 0x10); // At address $1000
-    try console.write(0x1000, 0xFF); // -1 in hex
+    try console.write(0x0002, 0x01); // At address $0100
+    try console.write(0x0100, 0xFF); // -1 in hex
     try cpu.step();
 
     try testing.expectEqual(expected_sum, cpu.a);
@@ -1138,7 +1141,7 @@ test "SBC signed subtraction with overflow" {
 
 test "AND" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     cpu.a = 0x00;
 
     try console.write(0x0000, 0x29); // AND Immediate instruction
@@ -1151,7 +1154,7 @@ test "AND" {
 
 test "ORA" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     cpu.a = 0x01;
 
     try console.write(0x0000, 0x09); // ORA Immediate instruction
@@ -1164,7 +1167,7 @@ test "ORA" {
 
 test "EOR" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     cpu.a = 0x01;
 
     try console.write(0x0000, 0x49); // EOR Immediate instruction
@@ -1177,7 +1180,7 @@ test "EOR" {
 
 test "INX allows for overflow" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     cpu.x = 0xFF;
 
     try console.write(0x0000, 0xE8); // INX instruction
@@ -1188,7 +1191,7 @@ test "INX allows for overflow" {
 
 test "INY" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_value: u8 = 0x01;
     cpu.y = 0x00;
 
@@ -1200,7 +1203,7 @@ test "INY" {
 
 test "DEX allows for overflow" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_value: u8 = 0xFF;
     cpu.x = 0x00;
 
@@ -1212,7 +1215,7 @@ test "DEX allows for overflow" {
 
 test "DEY allows for overflow" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_value: u8 = 0x00;
     cpu.y = 0x01;
 
@@ -1225,7 +1228,7 @@ test "DEY allows for overflow" {
 
 test "INC" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_value: u8 = 0x00;
 
     try console.write(0x0000, 0xE6); // INC ZeroPage instruction
@@ -1239,7 +1242,7 @@ test "INC" {
 
 test "DEC" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_value: u8 = 0xFF;
 
     try console.write(0x0000, 0xCE); // DEC Absolute instruction
@@ -1253,7 +1256,7 @@ test "DEC" {
 
 test "CMP" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     cpu.a = 0xFF;
 
     try console.write(0x0000, 0xC9); // CMP Immediate instruction
@@ -1266,7 +1269,7 @@ test "CMP" {
 
 test "CPX" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     cpu.x = 0x00;
 
     try console.write(0x0000, 0xE0); // CPX Immediate instruction
@@ -1278,7 +1281,7 @@ test "CPX" {
 
 test "CPY" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     cpu.y = 0x10;
 
     try console.write(0x0000, 0xCC); // CPY Absolute instruction
@@ -1292,7 +1295,7 @@ test "CPY" {
 
 test "BIT" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     cpu.a = 0x02;
 
     try console.write(0x0000, 0x2C); // BIT Absolute Instruction
@@ -1308,7 +1311,7 @@ test "BIT" {
 
 test "LSR" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0x7F;
     cpu.a = 0xFF;
 
@@ -1323,7 +1326,7 @@ test "LSR" {
 
 test "LSR Zero Flag is set if the result is zero" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0x00;
     cpu.a = 0x01;
 
@@ -1338,7 +1341,7 @@ test "LSR Zero Flag is set if the result is zero" {
 
 test "ASL" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0x00;
     cpu.a = 0x80;
 
@@ -1353,7 +1356,7 @@ test "ASL" {
 
 test "ROL" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0x80;
     cpu.a = 0xC0;
 
@@ -1367,7 +1370,7 @@ test "ROL" {
 
 test "ROR" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0x81;
     cpu.status.carry = true;
 
@@ -1383,7 +1386,7 @@ test "ROR" {
 
 test "JMP Absolute" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_pc: u16 = 0x4030;
 
     try console.write(0x0000, 0x4C); // JMP Absolute
@@ -1396,14 +1399,14 @@ test "JMP Absolute" {
 
 test "JMP Indirect" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_pc: u16 = 0x2010;
 
     try console.write(0x0000, 0x6C); // JMP Indirect
-    try console.write(0x0001, 0x30); // Indirect low byte
-    try console.write(0x0002, 0x40); // Indirect high byte
-    try console.write(0x4030, 0x10);
-    try console.write(0x4031, 0x20);
+    try console.write(0x0001, 0xFE); // Indirect low byte
+    try console.write(0x0002, 0x01); // Indirect high byte
+    try console.write(0x01FE, 0x10);
+    try console.write(0x01FF, 0x20);
     try cpu.step();
 
     try testing.expectEqual(expected_pc, cpu.pc);
@@ -1411,7 +1414,7 @@ test "JMP Indirect" {
 
 test "BMI" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_address: u16 = 0x0081;
     cpu.status.negative_result = true;
 
@@ -1424,7 +1427,7 @@ test "BMI" {
 
 test "BMI branching adds an additional cycle" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_address: u16 = 0x0080;
     cpu.pc = 0x000E;
     cpu.status.negative_result = true;
@@ -1439,7 +1442,7 @@ test "BMI branching adds an additional cycle" {
 
 test "BMI branching with a page boundary adds two additional cycles" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_address: u16 = 0x0100;
     cpu.pc = 0x00EE;
     cpu.status.negative_result = true;
@@ -1454,7 +1457,7 @@ test "BMI branching with a page boundary adds two additional cycles" {
 
 test "BPL" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_address: u16 = 0x0005;
     cpu.status.negative_result = true;
 
@@ -1467,7 +1470,7 @@ test "BPL" {
 
 test "BVS" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_address: u16 = 0x0005;
     cpu.status.overflow = true;
 
@@ -1480,7 +1483,7 @@ test "BVS" {
 
 test "BVC" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_address: u16 = 0x0005;
     cpu.status.overflow = false;
 
@@ -1493,7 +1496,7 @@ test "BVC" {
 
 test "BCS" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_address: u16 = 0x0005;
     cpu.status.carry = true;
 
@@ -1506,7 +1509,7 @@ test "BCS" {
 
 test "BCC" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_address: u16 = 0x0005;
     cpu.status.carry = false;
 
@@ -1519,7 +1522,7 @@ test "BCC" {
 
 test "BEQ" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_address: u16 = 0x0005;
     cpu.status.zero_result = true;
 
@@ -1532,7 +1535,7 @@ test "BEQ" {
 
 test "BNE" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_address: u16 = 0x0005;
     cpu.status.zero_result = false;
 
@@ -1545,7 +1548,7 @@ test "BNE" {
 
 test "JSR" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_address: u16 = 0x3000;
     cpu.pc = 0x1000;
 
@@ -1565,7 +1568,7 @@ test "JSR" {
 
 test "RTS" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_address: u16 = 0x1000;
     try cpu.stackPush(0x10);
     try cpu.stackPush(0x00);
@@ -1578,7 +1581,7 @@ test "RTS" {
 
 test "PHA" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
     cpu.a = 0xFF;
 
@@ -1590,7 +1593,7 @@ test "PHA" {
 
 test "PHP" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0x01;
     cpu.status.carry = true;
 
@@ -1602,7 +1605,7 @@ test "PHP" {
 
 test "PLA" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0xFF;
     try cpu.stackPush(expected_byte);
 
@@ -1614,7 +1617,7 @@ test "PLA" {
 
 test "PLP" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_byte: u8 = 0x03;
     try cpu.stackPush(expected_byte);
 
@@ -1633,7 +1636,7 @@ test "PLP" {
 
 test "RTI" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_stack_reg: u8 = 0x03;
     const expected_address: u16 = 0x1000;
     try cpu.stackPush(0x10); // First push the address in little endian
@@ -1647,23 +1650,9 @@ test "RTI" {
     try testing.expectEqual(expected_address, cpu.pc);
 }
 
-test "BRK" {
-    var console = Console{};
-    var cpu = Cpu.init(&console);
-    const expected_address: u16 = 0x0100;
-    cpu.status.negative_result = true;
-
-    try console.write(0x0000, 0x00); // BRK Instruction
-    try console.write(0xFFFE, 0x00); // Set the IRQ/BRK vector
-    try console.write(0xFFFF, 0x01);
-    try cpu.step();
-
-    try testing.expectEqual(expected_address, cpu.pc);
-}
-
 test "NOP" {
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
     const expected_address: u16 = 0x0001;
 
     try console.write(0x0000, 0xEA); // NOP Instruction

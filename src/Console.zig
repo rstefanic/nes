@@ -1,12 +1,13 @@
 const Console = @This();
 
 const std = @import("std");
+const testing = std.testing;
 const Cartridge = @import("Cartridge.zig");
 const Cpu = @import("Cpu.zig");
 
 cpu: ?*Cpu = null,
 cartridge: ?*Cartridge = null,
-memory: [0x10000]u8 = [_]u8{0xEA} ** 0x10000,
+memory: [0x800]u8 = std.mem.zeroes([0x800]u8),
 
 const ConsoleError = error{InvalidMemoryAddress};
 
@@ -19,18 +20,25 @@ pub fn connectCartridge(self: *Console, cartridge: *Cartridge) void {
 }
 
 pub fn read(self: *Console, address: u16) !u8 {
-    if (address >= 0x0000 and address <= 0xFFFF) {
-        return self.memory[address];
+    if (address >= 0x0000 and address <= 0x1FFF) {
+        return self.memory[address & 0x07FF];
     }
 
     return ConsoleError.InvalidMemoryAddress;
 }
 
 pub fn write(self: *Console, address: u16, value: u8) !void {
-    if (address >= 0x0000 and address <= 0xFFFF) {
-        self.memory[address] = value;
+    if (address >= 0x0000 and address <= 0x1FFF) {
+        self.memory[address & 0x07FF] = value;
         return;
     }
 
     return ConsoleError.InvalidMemoryAddress;
+}
+
+test "Accessing a RAM with mirrors between $0000 and $07FF" {
+    var console = Console{};
+
+    try console.write(0x1000, 0xFF);
+    try testing.expectEqual(@as(u8, 0xFF), try console.read(0x0000));
 }

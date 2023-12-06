@@ -16,7 +16,7 @@ pub fn main() !void {
     const allocator = fba.allocator();
 
     var console = Console{};
-    var cpu = Cpu.init(&console);
+    var cpu = try Cpu.init(&console);
 
     const args = try std.process.argsAlloc(allocator);
     if (args.len > 1) { // Treat any arguments as a filepath to a ROM
@@ -36,44 +36,21 @@ pub fn main() !void {
         raylib.ClearBackground(raylib.BLACK);
 
         // Events
-
         if (raylib.IsKeyPressed(raylib.KEY_S) or raylib.IsKeyPressed(raylib.KEY_SPACE)) {
             try cpu.step();
         }
 
         // Screen Drawing
-
         const x_spacing = 42;
         const y_spacing = 42;
         const window_padding = 10;
-        const address_start = 80;
         var options: DrawTextOptions = .{
             .pos_x = window_padding,
             .pos_y = 0,
             .font_size = 32,
         };
 
-        // Draw Memory
-
-        const mdd = MemoryDebugDisplay.init(console.memory, cpu.pc);
-        for (mdd.memory_display, 0..) |mem, i| {
-            const current_address = mdd.starting_address + i;
-
-            if ((current_address & 0xFFF0) == current_address) {
-                options.pos_x = window_padding;
-                options.pos_y += y_spacing;
-                try drawText(allocator, "{x:0>4}", .{current_address}, options);
-                options.pos_x = address_start;
-            }
-
-            options.pos_x += x_spacing;
-            options.color = if (cpu.pc == current_address) raylib.WHITE else raylib.GRAY;
-            try drawText(allocator, "{x}", .{mem}, options);
-            options.color = raylib.GRAY; // Reset color back to GRAY
-        }
-
         // Draw CPU Information
-
         options.font_size = 24;
         options.pos_x = window_padding;
 
@@ -159,34 +136,3 @@ fn drawText(allocator: std.mem.Allocator, comptime fmt: []const u8, args: anytyp
     var c_buf: [*c]const u8 = @ptrCast(buf); // Cast it to a C style pointer so raylib can use it
     raylib.DrawText(c_buf, options.pos_x, options.pos_y, options.font_size, options.color);
 }
-
-const MemoryDebugDisplay = struct {
-    memory_display: []const u8,
-    starting_address: u16,
-
-    pub fn init(memory: [0x10000]u8, pc: u16) MemoryDebugDisplay {
-        var start_row: u16 = undefined;
-        var end_row: u16 = undefined;
-
-        // We want to show five rows from memory at all times. Therefore, if
-        // the PC is within the first two rows or the last three rows, then we
-        // manually adjust the window to fix it at the start or end so that we
-        // don't overflow; otherwise we just calculate the start and end by
-        // taking two rows before the PC and three rows after the PC.
-        if (pc < 0x0020) {
-            start_row = 0x0000;
-            end_row = 0x0050;
-        } else if (pc > 0xFFC0) {
-            start_row = 0xFFA0;
-            end_row = 0xFFF0;
-        } else {
-            start_row = (pc & 0xFFF0) - 0x0020;
-            end_row = (pc & 0xFFF0) + 0x0030;
-        }
-
-        return .{
-            .memory_display = memory[start_row..end_row],
-            .starting_address = start_row,
-        };
-    }
-};
