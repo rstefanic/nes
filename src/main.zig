@@ -37,7 +37,7 @@ pub fn main() !void {
 
         // Events
         if (raylib.IsKeyPressed(raylib.KEY_S) or raylib.IsKeyPressed(raylib.KEY_SPACE)) {
-            try cpu.step();
+            try console.step();
         }
 
         // Screen Drawing

@@ -11,6 +11,10 @@ memory: [0x800]u8 = std.mem.zeroes([0x800]u8),
 
 const ConsoleError = error{InvalidMemoryAddress};
 
+pub fn step(self: *Console) !void {
+    try self.cpu.?.step();
+}
+
 pub fn connectCpu(self: *Console, cpu: *Cpu) void {
     self.cpu = cpu;
 }
