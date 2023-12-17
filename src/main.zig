@@ -16,7 +16,7 @@ pub fn main() !void {
     const allocator = fba.allocator();
 
     var console = Console{};
-    var cpu = try Cpu.init(&console);
+    var cpu = Cpu{ .console = &console };
     var cartridge: ?Cartridge = null;
 
     const args = try std.process.argsAlloc(allocator);
@@ -33,6 +33,9 @@ pub fn main() !void {
             cartridge.?.deinit();
         }
     }
+
+    console.connectCpu(&cpu);
+    try cpu.reset();
 
     raylib.SetConfigFlags(raylib.FLAG_VSYNC_HINT);
     raylib.InitWindow(WIDTH, HEIGHT, "NES");

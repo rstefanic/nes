@@ -30,22 +30,12 @@ status: packed struct(u8) {
     negative_result: bool = false,
 } = .{},
 
-pub fn init(console: *Console) !Cpu {
-    var cpu = Cpu{
-        .console = console,
-    };
-
-    console.connectCpu(&cpu);
-
-    // Read from the reset vector to init the PC
-    // if the console has a cartridge connected.
-    if (console.cartridge) |_| {
-        const lo_byte = try console.read(0xFFFC);
-        const hi_byte = try console.read(0xFFFD);
-        cpu.pc = makeWord(hi_byte, lo_byte);
+pub fn reset(self: *Cpu) !void {
+    if (self.console.cartridge) |_| {
+        const lo_byte = try self.console.read(0xFFFC);
+        const hi_byte = try self.console.read(0xFFFD);
+        self.pc = makeWord(hi_byte, lo_byte);
     }
-
-    return cpu;
 }
 
 inline fn makeWord(hi_byte: u8, lo_byte: u8) u16 {
