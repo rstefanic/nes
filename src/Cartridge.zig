@@ -19,6 +19,14 @@ const Header = struct {
         nes_2_format: u2,
         upper_mapper_number: u4,
     },
+    flag8: u8, // These flags are rarely used
+    flag9: u8,
+    flag10: u8,
+    flag11: u8, // Flags 11 - 15 are unused padding
+    flag12: u8,
+    flag13: u8,
+    flag14: u8,
+    flag15: u8,
 
     pub fn init(mem: *[16]u8) !Header {
         if (mem[0] != 'N' or mem[1] != 'E' or mem[2] != 'S' or mem[3] != 0x1a) {
@@ -31,6 +39,14 @@ const Header = struct {
             .chr_rom_size = mem[5],
             .flag6 = @bitCast(mem[6]),
             .flag7 = @bitCast(mem[7]),
+            .flag8 = mem[8],
+            .flag9 = mem[9],
+            .flag10 = mem[10],
+            .flag11 = mem[11],
+            .flag12 = mem[12],
+            .flag13 = mem[13],
+            .flag14 = mem[14],
+            .flag15 = mem[15],
         };
     }
 };
