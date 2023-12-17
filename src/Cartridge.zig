@@ -1,6 +1,7 @@
 const Cartridge = @This();
 
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 
 const Header = struct {
     signature: [4]u8,
@@ -51,22 +52,43 @@ const Header = struct {
     }
 };
 
+allocator: Allocator,
 header: Header,
-memory: [0xFFFF]u8,
+prg_rom_bank: []u8,
+chr_rom_bank: []u8,
 
-pub fn init(filename: []u8) !Cartridge {
+const KILOBYTE: u32 = 1024;
+const MEGABYTE: u32 = 1024 * KILOBYTE;
+
+pub fn init(allocator: Allocator, filename: []u8) !Cartridge {
     var file = try std.fs.cwd().openFile(filename, .{});
     defer file.close();
 
-    var mem: [0xFFFF]u8 = [_]u8{0} ** 0xFFFF;
-    const bytes_read = try file.read(&mem);
+    var data = try file.readToEndAlloc(allocator, MEGABYTE); // Shouldn't be larger than a MB, right?
+    defer allocator.free(data);
 
-    if (bytes_read < 16) {
-        return error.InvalidRomSize;
-    }
+    const header = try Header.init(data[0..@sizeOf(Header)]);
+    const prg_rom_bank_size = header.prg_rom_size * (16 * KILOBYTE);
+    const chr_rom_bank_size = header.chr_rom_size * (8 * KILOBYTE);
+
+    const prg_rom_bank = try allocator.alloc(u8, prg_rom_bank_size);
+    errdefer allocator.free(prg_rom_bank);
+    const chr_rom_bank = try allocator.alloc(u8, chr_rom_bank_size);
+
+    const prg_rom_idx = data.ptr + @sizeOf(Header);
+    const chr_rom_idx = data.ptr + @sizeOf(Header) + prg_rom_bank_size;
+    @memcpy(prg_rom_bank[0..prg_rom_bank_size], prg_rom_idx);
+    @memcpy(chr_rom_bank[0..chr_rom_bank_size], chr_rom_idx);
 
     return .{
-        .memory = mem,
-        .header = try Header.init(mem[0..16]),
+        .allocator = allocator,
+        .header = header,
+        .prg_rom_bank = prg_rom_bank,
+        .chr_rom_bank = chr_rom_bank,
     };
+}
+
+pub fn deinit(self: *Cartridge) void {
+    self.allocator.free(self.prg_rom_bank);
+    self.allocator.free(self.chr_rom_bank);
 }

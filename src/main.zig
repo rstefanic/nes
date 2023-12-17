@@ -17,14 +17,22 @@ pub fn main() !void {
 
     var console = Console{};
     var cpu = try Cpu.init(&console);
+    var cartridge: ?Cartridge = null;
 
     const args = try std.process.argsAlloc(allocator);
     if (args.len > 1) { // Treat any arguments as a filepath to a ROM
+        var gpa = std.heap.GeneralPurposeAllocator(.{}){};
         const cartridge_filename = args[1];
-        var cartridge = try Cartridge.init(cartridge_filename);
-        console.connectCartridge(&cartridge);
+        cartridge = try Cartridge.init(gpa.allocator(), cartridge_filename);
+        console.connectCartridge(&cartridge.?);
     }
     std.process.argsFree(allocator, args);
+
+    defer {
+        if (cartridge) |_| {
+            cartridge.?.deinit();
+        }
+    }
 
     raylib.SetConfigFlags(raylib.FLAG_VSYNC_HINT);
     raylib.InitWindow(WIDTH, HEIGHT, "NES");
