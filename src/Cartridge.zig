@@ -92,3 +92,21 @@ pub fn deinit(self: *Cartridge) void {
     self.allocator.free(self.prg_rom_bank);
     self.allocator.free(self.chr_rom_bank);
 }
+
+pub fn read(self: *Cartridge, address: u16) u8 {
+    if (self.header.prg_rom_size == 1) {
+        return self.prg_rom_bank[address & 0x3FFF];
+    }
+
+    return self.prg_rom_bank[address & 0x7FFF];
+}
+
+pub fn write(self: *Cartridge, address: u16, value: u8) void {
+    if (self.header.prg_rom_size == 1) {
+        self.prg_rom_bank[address & 0x3FFF] = value;
+        return;
+    }
+
+    self.prg_rom_bank[address & 0x7FFF] = value;
+    return;
+}

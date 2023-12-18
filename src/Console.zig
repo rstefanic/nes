@@ -31,11 +31,7 @@ pub fn read(self: *Console, address: u16) !u8 {
         return self.memory[address & 0x07FF];
     } else if (address >= 0x8000 and address <= 0xFFFF) {
         if (self.cartridge) |cartridge| {
-            if (cartridge.header.prg_rom_size == 1) {
-                return self.cartridge.?.prg_rom_bank[address & 0x3FFF];
-            }
-
-            return self.cartridge.?.prg_rom_bank[address & 0x7FFF];
+            return cartridge.read(address);
         } else {
             return ConsoleError.MissingCartridge;
         }
@@ -50,13 +46,7 @@ pub fn write(self: *Console, address: u16, value: u8) !void {
         return;
     } else if (address >= 0x8000 and address <= 0xFFFF) {
         if (self.cartridge) |cartridge| {
-            if (cartridge.header.prg_rom_size == 1) {
-                self.cartridge.?.prg_rom_bank[address & 0x3FFF] = value;
-                return;
-            }
-
-            self.cartridge.?.prg_rom_bank[address & 0x7FFF] = value;
-            return;
+            cartridge.write(address, value);
         } else {
             return ConsoleError.MissingCartridge;
         }
