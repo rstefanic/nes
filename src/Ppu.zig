@@ -40,3 +40,29 @@ ppuscroll: u8 = 0,
 ppuaddr: u8 = 0,
 ppudata: u8 = 0,
 oamdma: u8 = 0,
+
+pub fn read(self: *Ppu, address: u16) u8 {
+    return switch (address & 0x0007) {
+        0 => @bitCast(self.ppuctrl),
+        1 => @bitCast(self.ppumask),
+        2 => @bitCast(self.ppustatus),
+        3 => self.oamaddr,
+        4 => self.oamdata,
+        5 => self.ppuscroll,
+        6 => self.ppuaddr,
+        else => self.ppudata,
+    };
+}
+
+pub fn write(self: *Ppu, address: u16, value: u8) void {
+    switch (address & 0x0007) {
+        0 => self.ppuctrl = @bitCast(value),
+        1 => self.ppumask = @bitCast(value),
+        2 => self.ppustatus = @bitCast(value),
+        3 => self.oamaddr = value,
+        4 => self.oamdata = value,
+        5 => self.ppuscroll = value,
+        6 => self.ppuaddr = value,
+        else => self.ppudata = value,
+    }
+}

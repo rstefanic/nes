@@ -36,6 +36,8 @@ pub fn connectPpu(self: *Console, ppu: *Ppu) void {
 pub fn read(self: *Console, address: u16) !u8 {
     if (address >= 0x0000 and address <= 0x1FFF) {
         return self.memory[address & 0x07FF];
+    } else if (address >= 0x2000 and address <= 0x3FFF) {
+        return self.ppu.?.read(address);
     } else if (address >= 0x8000 and address <= 0xFFFF) {
         if (self.cartridge) |cartridge| {
             return cartridge.read(address);
@@ -50,6 +52,9 @@ pub fn read(self: *Console, address: u16) !u8 {
 pub fn write(self: *Console, address: u16, value: u8) !void {
     if (address >= 0x0000 and address <= 0x1FFF) {
         self.memory[address & 0x07FF] = value;
+        return;
+    } else if (address >= 0x2000 and address <= 0x3FFF) {
+        self.ppu.?.write(address, value);
         return;
     } else if (address >= 0x8000 and address <= 0xFFFF) {
         if (self.cartridge) |cartridge| {
