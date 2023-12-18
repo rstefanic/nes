@@ -59,6 +59,7 @@ pub fn write(self: *Console, address: u16, value: u8) !void {
     } else if (address >= 0x8000 and address <= 0xFFFF) {
         if (self.cartridge) |cartridge| {
             cartridge.write(address, value);
+            return;
         } else {
             return ConsoleError.MissingCartridge;
         }
