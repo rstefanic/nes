@@ -3,6 +3,7 @@ const std = @import("std");
 const Cartridge = @import("Cartridge.zig");
 const Console = @import("Console.zig");
 const Cpu = @import("Cpu.zig");
+const Ppu = @import("Ppu.zig");
 const raylib = @cImport({
     @cInclude("raylib.h");
 });
@@ -18,6 +19,7 @@ pub fn main() !void {
     var console = Console{};
     var cpu = Cpu{ .console = &console };
     var cartridge: ?Cartridge = null;
+    var ppu = Ppu{ .console = &console };
 
     const args = try std.process.argsAlloc(allocator);
     if (args.len > 1) { // Treat any arguments as a filepath to a ROM
@@ -35,6 +37,7 @@ pub fn main() !void {
     }
 
     console.connectCpu(&cpu);
+    console.connectPpu(&ppu);
     try cpu.reset();
 
     raylib.SetConfigFlags(raylib.FLAG_VSYNC_HINT);
