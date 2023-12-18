@@ -190,6 +190,7 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .CLC => self.clc(),
         .CLV => self.clv(),
         .SEI => self.sei(),
+        .CLD => self.cld(),
         .CLI => self.cli(),
         .LDA => try self.lda(address.?),
         .LDX => try self.ldx(address.?),
@@ -270,6 +271,9 @@ fn sei(self: *Cpu) void {
     self.status.interrupt_disable = true;
 }
 
+fn cld(self: *Cpu) void {
+    self.status.decimal_mode = false;
+}
 fn cli(self: *Cpu) void {
     self.status.interrupt_disable = false;
 }
@@ -760,6 +764,17 @@ test "SEI" {
     try cpu.step();
 
     try testing.expectEqual(cpu.status.interrupt_disable, true);
+}
+
+test "CLD" {
+    var console = Console{};
+    var cpu = Cpu{ .console = &console };
+    cpu.status.decimal_mode = true;
+
+    try console.write(0x0000, 0xD8);
+    try cpu.step();
+
+    try testing.expectEqual(cpu.status.decimal_mode, false);
 }
 
 test "CLI" {
