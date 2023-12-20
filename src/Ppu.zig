@@ -3,6 +3,7 @@ const Ppu = @This();
 const std = @import("std");
 
 const Console = @import("Console.zig");
+const Palette = @import("Palette.zig");
 
 console: *Console,
 
@@ -40,6 +41,8 @@ ppuscroll: u8 = 0,
 ppuaddr: u8 = 0,
 ppudata: u8 = 0,
 oamdma: u8 = 0,
+
+palette: Palette = Palette.init(),
 
 pub fn read(self: *Ppu, address: u16) u8 {
     return switch (address & 0x0007) {
