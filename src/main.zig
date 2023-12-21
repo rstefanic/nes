@@ -54,81 +54,112 @@ pub fn main() !void {
             try console.step();
         }
 
-        // Screen Drawing
-        const x_spacing = 42;
-        const y_spacing = 42;
         const window_padding = 10;
+        const x_start: c_int = 5;
+        const y_start: c_int = 5;
+        var x: c_int = x_start;
+        var y: c_int = y_start;
+
+        // Draw PPU Buffer
+        var i: usize = 0;
+        while (i < ppu.buffer.len) : (i += 1) {
+
+            // The NES Display buffer is 256 x 240. We need to check if we've
+            // drawn 256 pixels across here, and if we have, jump to the next
+            // line to start the next row of pixels.
+            //
+            // Since 256 x 240 is kind of small, we're going to double the the
+            // pixel display and draw a 2 x 2 rectangle for every pixel in the
+            // PPU buffer.
+            if ((i % 256) == 0) {
+                y += 2;
+                x = x_start;
+            } else {
+                x += 2;
+            }
+
+            const pal_code = ppu.buffer[i];
+            const color = ppu.palette.colors[pal_code];
+
+            raylib.DrawRectangle(x, y, 2, 2, raylib.Color{
+                .r = color.r,
+                .g = color.g,
+                .b = color.b,
+                .a = 255, // alpha
+            });
+        }
+
+        // Screen Drawing
+        const y_spacing = 42;
         var options: DrawTextOptions = .{
-            .pos_x = window_padding,
-            .pos_y = 0,
+            .pos_x = 530,
+            .pos_y = 20,
             .font_size = 32,
         };
 
         // Draw CPU Information
-        options.font_size = 24;
-        options.pos_x = window_padding;
-
-        options.pos_y += y_spacing * 2;
-        try drawText(allocator, "a: 0x{x:0>2}", .{cpu.a}, options);
-
-        options.pos_x += WIDTH / 2;
         try drawText(allocator, "cycles: {d}", .{cpu.cycles}, options);
 
-        options.pos_x = window_padding;
+        options.pos_y += y_spacing;
+        try drawText(allocator, "a: 0x{x:0>2}", .{cpu.a}, options);
+
         options.pos_y += y_spacing;
         try drawText(allocator, "x: 0x{x:0>2}", .{cpu.x}, options);
 
-        options.pos_x += WIDTH / 2;
-        try drawText(allocator, "pc: 0x{x:0>4}", .{cpu.pc}, options);
-
-        options.pos_x = window_padding;
         options.pos_y += y_spacing;
         try drawText(allocator, "y: 0x{x:0>2}", .{cpu.y}, options);
 
-        options.pos_x += WIDTH / 2;
+        options.pos_y += y_spacing;
+        try drawText(allocator, "pc: 0x{x:0>4}", .{cpu.pc}, options);
+
+        options.pos_y += y_spacing;
         try drawText(allocator, "sp: 0x{x:0>4}", .{cpu.sp}, options);
 
-        // Status Registers
-        options.pos_y += y_spacing;
-        options.pos_x = window_padding;
-        try drawText(allocator, "s:", .{}, options);
+        { // Status Registers
+            const sr_spacing: c_int = 24;
+            options.font_size = 28;
+            options.pos_y += y_spacing;
+            try drawText(allocator, "s:", .{}, options);
 
-        options.pos_x += x_spacing;
-        options.color = flagColor(cpu.status.negative_result);
-        try drawText(allocator, "N", .{}, options);
+            options.pos_x += sr_spacing * 2;
+            options.color = flagColor(cpu.status.negative_result);
+            try drawText(allocator, "N", .{}, options);
 
-        options.pos_x += x_spacing;
-        options.color = flagColor(cpu.status.overflow);
-        try drawText(allocator, "V", .{}, options);
+            options.pos_x += sr_spacing;
+            options.color = flagColor(cpu.status.overflow);
+            try drawText(allocator, "V", .{}, options);
 
-        options.pos_x += x_spacing;
-        options.color = raylib.GRAY;
-        try drawText(allocator, "-", .{}, options);
+            options.pos_x += sr_spacing;
+            options.color = raylib.GRAY;
+            try drawText(allocator, "-", .{}, options);
 
-        options.pos_x += x_spacing;
-        options.color = raylib.GRAY;
-        try drawText(allocator, "-", .{}, options);
+            options.pos_x += sr_spacing;
+            options.color = raylib.GRAY;
+            try drawText(allocator, "-", .{}, options);
 
-        options.pos_x += x_spacing;
-        options.color = flagColor(cpu.status.decimal_mode);
-        try drawText(allocator, "D", .{}, options);
+            options.pos_x += sr_spacing;
+            options.color = flagColor(cpu.status.decimal_mode);
+            try drawText(allocator, "D", .{}, options);
 
-        options.pos_x += x_spacing;
-        options.color = flagColor(cpu.status.interrupt_disable);
-        try drawText(allocator, "I", .{}, options);
+            options.pos_x += sr_spacing;
+            options.color = flagColor(cpu.status.interrupt_disable);
+            try drawText(allocator, "I", .{}, options);
 
-        options.pos_x += x_spacing;
-        options.color = flagColor(cpu.status.zero_result);
-        try drawText(allocator, "Z", .{}, options);
+            options.pos_x += sr_spacing;
+            options.color = flagColor(cpu.status.zero_result);
+            try drawText(allocator, "Z", .{}, options);
 
-        options.pos_x += x_spacing;
-        options.color = flagColor(cpu.status.carry);
-        try drawText(allocator, "C", .{}, options);
+            options.pos_x += sr_spacing;
+            options.color = flagColor(cpu.status.carry);
+            try drawText(allocator, "C", .{}, options);
+
+            options.color = raylib.GRAY; // Reset color
+        }
 
         // Draw instructions
-        options.pos_y += y_spacing * 2;
+        options.pos_y = 500;
+        options.font_size = 22;
         options.pos_x = window_padding;
-        options.color = raylib.GRAY;
         try drawText(allocator, "Press \"s\" or \"<space>\" to step through the next instruction.", .{}, options);
     }
 }
