@@ -3,6 +3,7 @@ const std = @import("std");
 const Cartridge = @import("Cartridge.zig");
 const Console = @import("Console.zig");
 const Cpu = @import("Cpu.zig");
+const Palette = @import("Palette.zig");
 const Ppu = @import("Ppu.zig");
 const raylib = @cImport({
     @cInclude("raylib.h");
@@ -52,6 +53,30 @@ pub fn main() !void {
         // Events
         if (raylib.IsKeyPressed(raylib.KEY_S) or raylib.IsKeyPressed(raylib.KEY_SPACE)) {
             try console.step();
+        }
+
+        if (raylib.IsFileDropped()) {
+            const file = raylib.LoadDroppedFiles();
+            defer raylib.UnloadDroppedFiles(file);
+            const filename = file.paths.*;
+
+            attempt_palette_load: {
+                if (!raylib.IsFileExtension(filename, ".pal")) {
+                    std.debug.print("NES: Unrecognized file format \"{s}\". Expected \".pal\".\n", .{raylib.GetFileExtension(filename)});
+                    break :attempt_palette_load;
+                }
+
+                const file_size = raylib.GetFileLength(filename);
+                const palette_size = 192;
+                if (file_size != palette_size) {
+                    std.debug.print("NES: Incorrect palette size. Expected \".pal\" file size {d} but received file size {d}.\n", .{ palette_size, file_size });
+                    break :attempt_palette_load;
+                }
+
+                var bytes_read: c_int = 0;
+                const palette = raylib.LoadFileData(filename, &bytes_read);
+                ppu.palette = Palette.init(@ptrCast(palette));
+            }
         }
 
         const window_padding = 10;
