@@ -42,7 +42,7 @@ ppuaddr: u8 = 0,
 ppudata: u8 = 0,
 oamdma: u8 = 0,
 
-palette: Palette = Palette.init(),
+palette: Palette = Palette.default(),
 buffer: [256 * 240]u8 = [_]u8{0x2C} ** (256 * 240),
 
 pub fn read(self: *Ppu, address: u16) u8 {

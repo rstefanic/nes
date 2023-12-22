@@ -5,19 +5,23 @@ const Color = struct { r: u8, g: u8, b: u8 };
 
 colors: [0x40]Color = undefined,
 
-pub fn init() Palette {
+pub fn default() Palette {
+    return Palette.init(NtscPalette);
+}
+
+pub fn init(color_data: *const [192:0]u8) Palette {
     var palette = Palette{};
-    var color_idx: usize = 0;
+    var palette_idx: usize = 0;
 
     var i: usize = 0;
-    while (i < NtscPalette.len) : (i += 3) {
-        palette.colors[color_idx] = Color{
-            .r = NtscPalette[i],
-            .g = NtscPalette[i + 1],
-            .b = NtscPalette[i + 2],
+    while (i < color_data.len) : (i += 3) {
+        palette.colors[palette_idx] = Color{
+            .r = color_data[i],
+            .g = color_data[i + 1],
+            .b = color_data[i + 2],
         };
 
-        color_idx += 1;
+        palette_idx += 1;
     }
 
     return palette;
