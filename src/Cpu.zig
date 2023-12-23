@@ -368,48 +368,44 @@ fn adc(self: *Cpu, address: u16) !void {
     const a = self.a;
     const value = try self.console.read(address);
 
-    var sum: u16 = @as(u16, a) + @as(u16, value);
-    var overflow = (a ^ sum) & (value ^ sum) & 0x80 > 0;
-
-    if (self.status.carry) {
-        const carry = 1;
-        const old = sum;
-        sum += carry;
-
-        // NOTE: I'm not sure if we need check if an overflow occurred
-        // from adding the carry bit, but I'm adding it here anyways
-        // just becuase it makes sense to me. ¯\_(ツ)_/¯
-        overflow = overflow or ((old ^ sum) & (carry ^ sum) & 0x80 > 0);
-    }
-
+    const carry: u1 = if (self.status.carry) 1 else 0;
+    var sum: u16 = @as(u16, a) + @as(u16, value) + carry;
     const result: u8 = @truncate(sum);
-    self.a = result;
 
+    self.a = result;
     self.status.carry = sum > 0xFF;
-    self.status.overflow = overflow;
+    self.status.overflow = (a ^ sum) & (value ^ sum) & 0x80 > 0;
     self.handleZeroFlagStatus(result);
     self.handleNegativeFlagStatus(result);
 }
 
 fn sbc(self: *Cpu, address: u16) !void {
+    // SBC is sort of the same as ADC, but with subtraction. Technically, we
+    // could just take the one's complement of the operand and call ADC to get
+    // the same result as we get here.
+
     const a = self.a;
-    const value = try self.console.read(address);
+    var value = try self.console.read(address);
 
-    var diff: u16 = @as(u16, a) -% @as(u16, value);
-    var overflow = (a ^ diff) & (value ^ diff) & 0x80 <= 0;
-
-    if (self.status.carry) {
-        const carry = 1;
-        const old = diff;
-        diff -= carry;
-        overflow = overflow or ((old ^ diff) & (carry ^ diff) & 0x80 <= 0);
-    }
-
+    // For this instruction, the carry flag is interpreted as a "not borrowed"
+    // flag which is just the carry flag inverted. Typically when writing 6502,
+    // the setup before calling SBC typically looks like this:
+    //
+    //              ;SBC: A = A - M - ~C
+    // SEC          ;set carry in preparation
+    // LDA #15      ;load 15 into the accumulator
+    // SBC #8       ;subtract 8 -> now 7 in accumulator
+    //
+    // We get the "not borrowed" flag by flipping the carry flag.
+    // If it's clear, it means a borrow did happen.
+    // If it's set, it means a borrow did not happen.
+    const carry: u1 = if (self.status.carry) 1 else 0;
+    var diff: u16 = @as(u16, a) -% @as(u16, value) - ~carry;
     const result: u8 = @truncate(diff);
-    self.a = result;
 
+    self.a = result;
     self.status.carry = diff > 0xFF;
-    self.status.overflow = overflow;
+    self.status.overflow = (a ^ diff) & (value ^ diff) & 0x80 <= 0;
     self.handleZeroFlagStatus(result);
     self.handleNegativeFlagStatus(result);
 }
@@ -1132,6 +1128,7 @@ test "ADC signed addition with overflow" {
 test "SBC signed subtraction" {
     var console = Console{};
     var cpu = Cpu{ .console = &console };
+    cpu.status.carry = true;
     const expected_sum: u8 = 0xFD; // -3 in hex
     cpu.a = 0xFE; // -2 in hex
 
@@ -1147,6 +1144,7 @@ test "SBC signed subtraction" {
 test "SBC signed subtraction with overflow" {
     var console = Console{};
     var cpu = Cpu{ .console = &console };
+    cpu.status.carry = true;
     const expected_sum: u8 = 0x80; // -128 in hex
     cpu.a = 0x7F; // 127 in hex
 
