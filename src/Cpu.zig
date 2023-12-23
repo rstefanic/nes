@@ -187,6 +187,7 @@ fn execute(self: *Cpu, ins: Instruction) !void {
 
     switch (ins.opcode) {
         .SEC => self.sec(),
+        .SED => self.sed(),
         .CLC => self.clc(),
         .CLV => self.clv(),
         .SEI => self.sei(),
@@ -241,7 +242,6 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .RTI => try self.rti(),
         .BRK => try self.brk(),
         .NOP => self.nop(),
-        else => return error.OpcodeExecutionNotYetImplemented,
     }
 
     self.cycles += ins.cycles + additional_cycles;
@@ -257,6 +257,10 @@ inline fn handleNegativeFlagStatus(self: *Cpu, byte: u8) void {
 
 fn sec(self: *Cpu) void {
     self.status.carry = true;
+}
+
+fn sed(self: *Cpu) void {
+    self.status.decimal_mode = true;
 }
 
 fn clc(self: *Cpu) void {
@@ -733,6 +737,16 @@ test "SEC" {
     try cpu.step();
 
     try testing.expectEqual(cpu.status.carry, true);
+}
+
+test "SED" {
+    var console = Console{};
+    var cpu = Cpu{ .console = &console };
+
+    try console.write(0x0000, 0xF8);
+    try cpu.step();
+
+    try testing.expectEqual(cpu.status.decimal_mode, true);
 }
 
 test "CLC" {
