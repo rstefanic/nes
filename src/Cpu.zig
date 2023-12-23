@@ -360,10 +360,11 @@ fn tsx(self: *Cpu) !void {
     self.x = value;
 }
 
-/// ADC is kind of a pain. It adds three values together: (1) the accumulator,
-/// (2) the byte specified by the operand, and (3) the carry flag. The result
-/// of the operation is stored in the accumulator.
 fn adc(self: *Cpu, address: u16) !void {
+    // ADC is kind of a pain. It adds three values together: (1) the accumulator,
+    // (2) the byte specified by the operand, and (3) the carry flag. The result
+    // of the operation is stored in the accumulator.
+
     const a = self.a;
     const value = try self.console.read(address);
 
