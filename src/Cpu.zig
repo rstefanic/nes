@@ -36,6 +36,17 @@ pub fn reset(self: *Cpu) !void {
         const hi_byte = try self.console.read(0xFFFD);
         self.pc = makeWord(hi_byte, lo_byte);
     }
+
+    // Reset does not write the current PC and status onto the stack like the
+    // other interrupts; however, it still goes through the cycles of pushing
+    // the return address and status flags onto the stack (even though it
+    // discards them) and copies the the value of the reset vector into the PC.
+    // So a RESET takes 7 cycles and the stack has 3 fake push operations that
+    // decrements the stack pointer 3 times, and interrupt disable is set.
+    self.cycles = 7;
+    self.sp = 0xFD;
+    self.status = .{};
+    self.status.interrupt_disable = true;
 }
 
 inline fn makeWord(hi_byte: u8, lo_byte: u8) u16 {
