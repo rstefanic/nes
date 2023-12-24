@@ -102,7 +102,7 @@ pub fn decode(byte: u8) error{InvalidInstruction}!Instruction {
         0x1D => .{ .opcode = .ORA, .mode = .AbsoluteX, .cycles = 4 },
         0x1E => .{ .opcode = .ASL, .mode = .AbsoluteX, .cycles = 7 },
 
-        0x20 => .{ .opcode = .JSR, .mode = .Absolute, .cycles = 2 },
+        0x20 => .{ .opcode = .JSR, .mode = .Absolute, .cycles = 6 },
         0x21 => .{ .opcode = .AND, .mode = .IndexedIndirect, .cycles = 6 },
         0x24 => .{ .opcode = .BIT, .mode = .ZeroPage, .cycles = 3 },
         0x25 => .{ .opcode = .AND, .mode = .ZeroPage, .cycles = 3 },
