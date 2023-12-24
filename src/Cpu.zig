@@ -25,7 +25,7 @@ status: packed struct(u8) {
     interrupt_disable: bool = false,
     decimal_mode: bool = false,
     break_interrupt: bool = false,
-    _: u1 = 0,
+    _: u1 = 1,
     overflow: bool = false,
     negative_result: bool = false,
 } = .{},
