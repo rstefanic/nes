@@ -17,6 +17,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const raylib = raylib_build.addRaylib(b, target, optimize, .{});
+    const nestest_log = std.build.FileSource.relative("data/nestest.log");
 
     const exe = b.addExecutable(.{
         .name = "nes",
@@ -29,6 +30,7 @@ pub fn build(b: *std.Build) void {
 
     exe.linkLibrary(raylib);
     exe.addIncludePath(.{ .path = "libs/raylib/src" });
+    exe.addAnonymousModule("data/nestest.log", .{ .source_file = nestest_log });
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
