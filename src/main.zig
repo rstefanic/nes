@@ -5,6 +5,7 @@ const Console = @import("Console.zig");
 const Cpu = @import("Cpu.zig");
 const Palette = @import("Palette.zig");
 const Ppu = @import("Ppu.zig");
+const NesLog = @import("NesLog.zig");
 const raylib = @cImport({
     @cInclude("raylib.h");
 });
@@ -41,6 +42,12 @@ pub fn main() !void {
     console.connectPpu(&ppu);
     try cpu.reset();
 
+    var neslog = NesLog.init();
+
+    // The first log entry is the expected start state of the CPU,
+    // which we know is valid. So this log entry is ignored.
+    _ = try neslog.next();
+
     raylib.SetConfigFlags(raylib.FLAG_VSYNC_HINT);
     raylib.InitWindow(WIDTH, HEIGHT, "NES");
     defer raylib.CloseWindow();
@@ -53,6 +60,29 @@ pub fn main() !void {
         // Events
         if (raylib.IsKeyPressed(raylib.KEY_S) or raylib.IsKeyPressed(raylib.KEY_SPACE)) {
             try console.step();
+
+            if (try neslog.next()) |log| {
+                const same = log.compare(&cpu);
+                if (!same) {
+                    std.debug.print("NESLOG: Incorrect CPU state on line {d}\n", .{neslog.current_line_num});
+                    std.debug.print("\tLOG: A:{X} X:{X} Y:{X} P:{X} SP:{X} CYC:{d}\n", .{
+                        log.a,
+                        log.x,
+                        log.y,
+                        log.p,
+                        log.sp,
+                        log.cycles,
+                    });
+                    std.debug.print("\tCPU: A:{X} X:{X} Y:{X} P:{X} SP:{X} CYC:{d}\n", .{
+                        cpu.a,
+                        cpu.x,
+                        cpu.y,
+                        @as(u8, @bitCast(cpu.status)),
+                        cpu.sp,
+                        cpu.cycles,
+                    });
+                }
+            }
         }
 
         if (raylib.IsFileDropped()) {
