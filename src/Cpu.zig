@@ -70,7 +70,20 @@ fn read(self: *Cpu, address: u16) !u8 {
     if (address >= 0x0000 and address <= 0x1FFF) {
         return self.console.memory[address & 0x07FF];
     } else if (address >= 0x2000 and address <= 0x3FFF) {
-        return self.console.ppu.?.read(address);
+
+        // Read a PPU register
+        if (self.console.ppu) |ppu| {
+            return switch (address & 0x0007) {
+                0 => @bitCast(ppu.ppuctrl),
+                1 => @bitCast(ppu.ppumask),
+                2 => @bitCast(ppu.ppustatus),
+                3 => ppu.oamaddr,
+                4 => ppu.oamdata,
+                5 => ppu.ppuscroll,
+                6 => ppu.ppuaddr,
+                else => ppu.ppudata,
+            };
+        }
     } else if (address >= 0x8000 and address <= 0xFFFF) {
         if (self.console.cartridge) |cartridge| {
             return cartridge.read(address);
@@ -87,7 +100,20 @@ fn write(self: *Cpu, address: u16, value: u8) !void {
         self.console.memory[address & 0x07FF] = value;
         return;
     } else if (address >= 0x2000 and address <= 0x3FFF) {
-        self.console.ppu.?.write(address, value);
+
+        // Write to a PPU register
+        if (self.console.ppu) |ppu| {
+            switch (address & 0x0007) {
+                0 => ppu.ppuctrl = @bitCast(value),
+                1 => ppu.ppumask = @bitCast(value),
+                2 => ppu.ppustatus = @bitCast(value),
+                3 => ppu.oamaddr = value,
+                4 => ppu.oamdata = value,
+                5 => ppu.ppuscroll = value,
+                6 => ppu.ppuaddr = value,
+                else => ppu.ppudata = value,
+            }
+        }
         return;
     } else if (address >= 0x8000 and address <= 0xFFFF) {
         if (self.console.cartridge) |cartridge| {
