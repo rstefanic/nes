@@ -61,13 +61,53 @@ const StackError = error{
     StackUnderflow,
 };
 
+const CpuMemoryAccessError = error{
+    InvalidMemoryAddress,
+    MissingCartridge,
+};
+
+fn read(self: *Cpu, address: u16) !u8 {
+    if (address >= 0x0000 and address <= 0x1FFF) {
+        return self.console.memory[address & 0x07FF];
+    } else if (address >= 0x2000 and address <= 0x3FFF) {
+        return self.console.ppu.?.read(address);
+    } else if (address >= 0x8000 and address <= 0xFFFF) {
+        if (self.console.cartridge) |cartridge| {
+            return cartridge.read(address);
+        } else {
+            return CpuMemoryAccessError.MissingCartridge;
+        }
+    }
+
+    return CpuMemoryAccessError.InvalidMemoryAddress;
+}
+
+fn write(self: *Cpu, address: u16, value: u8) !void {
+    if (address >= 0x0000 and address <= 0x1FFF) {
+        self.console.memory[address & 0x07FF] = value;
+        return;
+    } else if (address >= 0x2000 and address <= 0x3FFF) {
+        self.console.ppu.?.write(address, value);
+        return;
+    } else if (address >= 0x8000 and address <= 0xFFFF) {
+        if (self.console.cartridge) |cartridge| {
+            cartridge.write(address, value);
+            return;
+        } else {
+            return CpuMemoryAccessError.MissingCartridge;
+        }
+    }
+
+    return CpuMemoryAccessError.InvalidMemoryAddress;
+}
+
 fn stackPush(self: *Cpu, value: u8) !void {
     const address: u16 = stack_begin + self.sp;
     if (address > stack_end) {
         return StackError.StackOverflow;
     }
 
-    try self.console.write(address, value);
+    try self.write(address, value);
     self.sp -= 1;
 }
 
@@ -78,7 +118,7 @@ fn stackPop(self: *Cpu) !u8 {
         return StackError.StackUnderflow;
     }
 
-    const value = try self.console.read(address);
+    const value = try self.read(address);
     return value;
 }
 
@@ -91,7 +131,7 @@ pub fn step(self: *Cpu) !void {
 inline fn fetch(self: *Cpu) !u8 {
     const address = self.pc;
     self.pc += 1;
-    return try self.console.read(address);
+    return try self.read(address);
 }
 
 inline fn addressPagesDiffer(address_a: u16, address_b: u16) bool {
@@ -168,8 +208,8 @@ fn execute(self: *Cpu, ins: Instruction) !void {
             const lo = try self.fetch();
             const hi = try self.fetch();
             const indirect_addr = makeWord(hi, lo);
-            const effective_lo = try self.console.read(indirect_addr);
-            const effective_hi = try self.console.read(indirect_addr + 1);
+            const effective_lo = try self.read(indirect_addr);
+            const effective_hi = try self.read(indirect_addr + 1);
             address = makeWord(effective_hi, effective_lo);
         },
         .IndexedIndirect => {
@@ -177,16 +217,16 @@ fn execute(self: *Cpu, ins: Instruction) !void {
             // 16 bit effective address. This lookup address should never overflow onto the
             // next page, so we'll mod the result by 0xFF to stay on the zero-page.
             const byte = (try self.fetch() + self.x) % 0xFF;
-            const lo = try self.console.read(makeWord(0x00, byte));
-            const hi = try self.console.read(makeWord(0x00, byte + 1));
+            const lo = try self.read(makeWord(0x00, byte));
+            const hi = try self.read(makeWord(0x00, byte + 1));
             address = makeWord(hi, lo);
         },
         .IndirectIndexed => {
             // The operand is a zero-page address to a pointer. Y is added to
             // the pointer to mimic indexing giving us the effective address.
             const byte = try self.fetch();
-            const lo = try self.console.read(makeWord(0x00, byte));
-            const hi = try self.console.read(makeWord(0x00, byte + 1));
+            const lo = try self.read(makeWord(0x00, byte));
+            const hi = try self.read(makeWord(0x00, byte + 1));
             const effective_address = makeWord(hi, lo);
             if (addressPagesDiffer(effective_address, effective_address + self.y)) {
                 additional_cycles += 1;
@@ -295,7 +335,7 @@ fn cli(self: *Cpu) void {
 }
 
 fn lda(self: *Cpu, address: u16) !void {
-    const value = try self.console.read(address);
+    const value = try self.read(address);
     self.a = value;
 
     self.handleZeroFlagStatus(value);
@@ -303,7 +343,7 @@ fn lda(self: *Cpu, address: u16) !void {
 }
 
 fn ldx(self: *Cpu, address: u16) !void {
-    const value = try self.console.read(address);
+    const value = try self.read(address);
     self.x = value;
 
     self.handleZeroFlagStatus(value);
@@ -311,7 +351,7 @@ fn ldx(self: *Cpu, address: u16) !void {
 }
 
 fn ldy(self: *Cpu, address: u16) !void {
-    const value = try self.console.read(address);
+    const value = try self.read(address);
     self.y = value;
 
     self.handleZeroFlagStatus(value);
@@ -319,15 +359,15 @@ fn ldy(self: *Cpu, address: u16) !void {
 }
 
 fn sta(self: *Cpu, address: u16) !void {
-    try self.console.write(address, self.a);
+    try self.write(address, self.a);
 }
 
 fn stx(self: *Cpu, address: u16) !void {
-    try self.console.write(address, self.x);
+    try self.write(address, self.x);
 }
 
 fn sty(self: *Cpu, address: u16) !void {
-    try self.console.write(address, self.y);
+    try self.write(address, self.y);
 }
 
 fn tax(self: *Cpu) void {
@@ -377,7 +417,7 @@ fn adc(self: *Cpu, address: u16) !void {
     // of the operation is stored in the accumulator.
 
     const a = self.a;
-    const value = try self.console.read(address);
+    const value = try self.read(address);
 
     const carry: u1 = if (self.status.carry) 1 else 0;
     var sum: u16 = @as(u16, a) + @as(u16, value) + carry;
@@ -423,7 +463,7 @@ fn sbc(self: *Cpu, address: u16) !void {
 
 fn aand(self: *Cpu, address: u16) !void {
     const a = self.a;
-    const value = try self.console.read(address);
+    const value = try self.read(address);
     const result = a & value;
 
     self.handleZeroFlagStatus(result);
@@ -432,7 +472,7 @@ fn aand(self: *Cpu, address: u16) !void {
 
 fn ora(self: *Cpu, address: u16) !void {
     const a = self.a;
-    const value = try self.console.read(address);
+    const value = try self.read(address);
     const result = a | value;
 
     self.handleZeroFlagStatus(result);
@@ -441,7 +481,7 @@ fn ora(self: *Cpu, address: u16) !void {
 
 fn eor(self: *Cpu, address: u16) !void {
     const a = self.a;
-    const value = try self.console.read(address);
+    const value = try self.read(address);
     const result = a ^ value;
 
     self.handleZeroFlagStatus(result);
@@ -481,25 +521,25 @@ fn dey(self: *Cpu) void {
 }
 
 fn inc(self: *Cpu, address: u16) !void {
-    const value = try self.console.read(address);
+    const value = try self.read(address);
     const result = value +% 1;
-    try self.console.write(address, result);
+    try self.write(address, result);
 
     self.handleZeroFlagStatus(result);
     self.handleNegativeFlagStatus(result);
 }
 
 fn dec(self: *Cpu, address: u16) !void {
-    const value = try self.console.read(address);
+    const value = try self.read(address);
     const result = value -% 1;
-    try self.console.write(address, result);
+    try self.write(address, result);
 
     self.handleZeroFlagStatus(result);
     self.handleNegativeFlagStatus(result);
 }
 
 fn cmp(self: *Cpu, address: u16) !void {
-    const value = try self.console.read(address);
+    const value = try self.read(address);
     const result = self.a -% value;
 
     self.status.carry = self.a >= value;
@@ -508,7 +548,7 @@ fn cmp(self: *Cpu, address: u16) !void {
 }
 
 fn cpx(self: *Cpu, address: u16) !void {
-    const value = try self.console.read(address);
+    const value = try self.read(address);
     const result = self.x -% value;
 
     self.status.carry = self.x >= value;
@@ -517,7 +557,7 @@ fn cpx(self: *Cpu, address: u16) !void {
 }
 
 fn cpy(self: *Cpu, address: u16) !void {
-    const value = try self.console.read(address);
+    const value = try self.read(address);
     const result = self.y -% value;
 
     self.status.carry = self.y >= value;
@@ -527,7 +567,7 @@ fn cpy(self: *Cpu, address: u16) !void {
 
 fn bit(self: *Cpu, address: u16) !void {
     const a = self.a;
-    const value = try self.console.read(address);
+    const value = try self.read(address);
     const result = a & value;
 
     // For BIT, the zero flag is handled as normal but the overflow and negative
@@ -540,7 +580,7 @@ fn bit(self: *Cpu, address: u16) !void {
 /// LSR allows the operand to either be a value in memory or the accumulator.
 /// Passing NULL as `address` will perform LSR on the accumulator.
 fn lsr(self: *Cpu, address: ?u16) !void {
-    const value = if (address) |addr| try self.console.read(addr) else self.a;
+    const value = if (address) |addr| try self.read(addr) else self.a;
     const shifted_bit = value & 1;
     const result = value >> 1;
 
@@ -549,7 +589,7 @@ fn lsr(self: *Cpu, address: ?u16) !void {
     self.status.negative_result = false; // Since the 7th bit will always be 0 from SHL
 
     if (address) |addr| {
-        try self.console.write(addr, result);
+        try self.write(addr, result);
     } else {
         self.a = result;
     }
@@ -558,7 +598,7 @@ fn lsr(self: *Cpu, address: ?u16) !void {
 /// ASL allows the operand to either be a value in memory or the accumulator.
 /// Passing NULL as `address` will perform ASL on the accumulator.
 fn asl(self: *Cpu, address: ?u16) !void {
-    const value = if (address) |addr| try self.console.read(addr) else self.a;
+    const value = if (address) |addr| try self.read(addr) else self.a;
     const shifted_bit: u1 = if ((value & 0x80) == 0x80) 1 else 0;
     const result = value << 1;
 
@@ -567,14 +607,14 @@ fn asl(self: *Cpu, address: ?u16) !void {
     self.handleNegativeFlagStatus(result);
 
     if (address) |addr| {
-        try self.console.write(addr, result);
+        try self.write(addr, result);
     } else {
         self.a = result;
     }
 }
 
 fn rol(self: *Cpu, address: ?u16) !void {
-    const value = if (address) |addr| try self.console.read(addr) else self.a;
+    const value = if (address) |addr| try self.read(addr) else self.a;
     const shifted_bit: u1 = if ((value & 0x80) == 0x80) 1 else 0;
     const carry: u1 = if (self.status.carry) 1 else 0;
     const result = (value << 1) | carry;
@@ -584,14 +624,14 @@ fn rol(self: *Cpu, address: ?u16) !void {
     self.handleNegativeFlagStatus(result);
 
     if (address) |addr| {
-        try self.console.write(addr, result);
+        try self.write(addr, result);
     } else {
         self.a = result;
     }
 }
 
 fn ror(self: *Cpu, address: ?u16) !void {
-    const value = if (address) |addr| try self.console.read(addr) else self.a;
+    const value = if (address) |addr| try self.read(addr) else self.a;
     const shifted_bit = value & 1;
     const carry: u8 = if (self.status.carry) 0x80 else 0x00;
     const result = (value >> 1) | carry;
@@ -601,7 +641,7 @@ fn ror(self: *Cpu, address: ?u16) !void {
     self.handleNegativeFlagStatus(result);
 
     if (address) |addr| {
-        try self.console.write(addr, result);
+        try self.write(addr, result);
     } else {
         self.a = result;
     }
@@ -728,8 +768,8 @@ fn brk(self: *Cpu) !void {
     try self.stackPush(@truncate(self.pc & 0x00FF));
 
     // Read from the IRQ/BRK vector
-    const lo_byte = try self.console.read(0xFFFE);
-    const hi_byte = try self.console.read(0xFFFF);
+    const lo_byte = try self.read(0xFFFE);
+    const hi_byte = try self.read(0xFFFF);
     self.pc = makeWord(hi_byte, lo_byte);
 }
 
