@@ -27,10 +27,3 @@ pub fn connectCartridge(self: *Console, cartridge: *Cartridge) void {
 pub fn connectPpu(self: *Console, ppu: *Ppu) void {
     self.ppu = ppu;
 }
-
-test "Accessing a RAM with mirrors between $0000 and $07FF" {
-    var console = Console{};
-
-    try console.write(0x1000, 0xFF);
-    try testing.expectEqual(@as(u8, 0xFF), try console.read(0x0000));
-}
