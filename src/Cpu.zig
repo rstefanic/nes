@@ -492,6 +492,7 @@ fn aand(self: *Cpu, address: u16) !void {
     const value = try self.read(address);
     const result = a & value;
 
+    self.a = result;
     self.handleZeroFlagStatus(result);
     self.handleNegativeFlagStatus(result);
 }
@@ -501,6 +502,7 @@ fn ora(self: *Cpu, address: u16) !void {
     const value = try self.read(address);
     const result = a | value;
 
+    self.a = result;
     self.handleZeroFlagStatus(result);
     self.handleNegativeFlagStatus(result);
 }
@@ -510,6 +512,7 @@ fn eor(self: *Cpu, address: u16) !void {
     const value = try self.read(address);
     const result = a ^ value;
 
+    self.a = result;
     self.handleZeroFlagStatus(result);
     self.handleNegativeFlagStatus(result);
 }
@@ -1254,25 +1257,29 @@ test "SBC signed subtraction with overflow" {
 test "AND" {
     var console = Console{};
     var cpu = Cpu{ .console = &console };
-    cpu.a = 0x00;
+    const expected_result: u8 = 0x02;
+    cpu.a = 0xFF;
 
     try cpu.write(0x0000, 0x29); // AND Immediate instruction
     try cpu.write(0x0001, 0x02);
     try cpu.step();
 
-    try testing.expectEqual(true, cpu.status.zero_result);
+    try testing.expectEqual(expected_result, cpu.a);
+    try testing.expectEqual(false, cpu.status.zero_result);
     try testing.expectEqual(false, cpu.status.negative_result);
 }
 
 test "ORA" {
     var console = Console{};
     var cpu = Cpu{ .console = &console };
+    const expected_result: u8 = 0x01;
     cpu.a = 0x01;
 
     try cpu.write(0x0000, 0x09); // ORA Immediate instruction
     try cpu.write(0x0001, 0x00);
     try cpu.step();
 
+    try testing.expectEqual(expected_result, cpu.a);
     try testing.expectEqual(false, cpu.status.zero_result);
     try testing.expectEqual(false, cpu.status.negative_result);
 }
@@ -1280,12 +1287,14 @@ test "ORA" {
 test "EOR" {
     var console = Console{};
     var cpu = Cpu{ .console = &console };
+    const expected_result: u8 = 0x00;
     cpu.a = 0x01;
 
     try cpu.write(0x0000, 0x49); // EOR Immediate instruction
     try cpu.write(0x0001, 0x01);
     try cpu.step();
 
+    try testing.expectEqual(expected_result, cpu.a);
     try testing.expectEqual(true, cpu.status.zero_result);
     try testing.expectEqual(false, cpu.status.negative_result);
 }
