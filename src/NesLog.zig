@@ -74,6 +74,6 @@ inline fn parseSpReg(data: []const u8) !u8 {
     return try std.fmt.parseInt(u8, data[23..25], 16);
 }
 
-inline fn parseCycles(data: []const u8) !u8 {
-    return try std.fmt.parseInt(u8, data[42..], 10);
+inline fn parseCycles(data: []const u8) !u64 {
+    return try std.fmt.parseInt(u64, data[42..], 10);
 }
