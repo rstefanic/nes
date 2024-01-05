@@ -10,8 +10,8 @@ const raylib = @cImport({
     @cInclude("raylib.h");
 });
 
-const WIDTH = 800;
-const HEIGHT = 600;
+const WIDTH = 1024;
+const HEIGHT = 768;
 
 pub fn main() !void {
     var buffer: [1000]u8 = undefined;
@@ -40,6 +40,7 @@ pub fn main() !void {
 
     console.connectCpu(&cpu);
     console.connectPpu(&ppu);
+    try ppu.setupPatternTables();
     try cpu.reset();
 
     var neslog = NesLog.init();
@@ -142,6 +143,71 @@ pub fn main() !void {
                 .b = color.b,
                 .a = 255, // alpha
             });
+        }
+
+        // Draw Left/Right Pattern Table
+        pattern_table: {
+            const x_pattern_table_start: c_int = 800;
+            const y_pattern_table_start: c_int = 5;
+
+            x = x_pattern_table_start;
+            y = y_pattern_table_start;
+
+            const colors: [4]raylib.Color = [_]raylib.Color{
+                raylib.WHITE,
+                raylib.BLUE,
+                raylib.GRAY,
+                raylib.BLACK,
+            };
+
+            if (cartridge) |c| {
+
+                // If it's empty, then there's nothing to draw :(
+                if (c.chr_rom_bank.len == 0) {
+                    break :pattern_table;
+                }
+
+                i = 0; // Reset `i`
+                while (i < ppu.left_pattern_table.len) : (i += 1) {
+                    if ((i % 16) == 0) {
+                        y += 8;
+                        x = x_pattern_table_start;
+                    } else {
+                        x += 8;
+                    }
+
+                    var j: u32 = 0;
+                    while (j < 8) : (j += 1) {
+                        var k: u32 = 0;
+                        while (k < 8) : (k += 1) {
+                            const pixel = ppu.left_pattern_table[i][(8 * j) + k];
+                            const color = colors[pixel];
+                            raylib.DrawPixel(x + @as(c_int, @bitCast(k)), y + @as(c_int, @bitCast(j)), color);
+                        }
+                    }
+                }
+
+                y += 5; // More Y padding
+                i = 0; // Reset `i`
+                while (i < ppu.right_pattern_table.len) : (i += 1) {
+                    if ((i % 16) == 0) {
+                        y += 8;
+                        x = x_pattern_table_start;
+                    } else {
+                        x += 8;
+                    }
+
+                    var j: u32 = 0;
+                    while (j < 8) : (j += 1) {
+                        var k: u32 = 0;
+                        while (k < 8) : (k += 1) {
+                            const pixel = ppu.right_pattern_table[i][(8 * j) + k];
+                            const color = colors[pixel];
+                            raylib.DrawPixel(x + @as(c_int, @bitCast(k)), y + @as(c_int, @bitCast(j)), color);
+                        }
+                    }
+                }
+            }
         }
 
         // Screen Drawing
