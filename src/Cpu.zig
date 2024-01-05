@@ -774,7 +774,11 @@ fn php(self: *Cpu) !void {
 }
 
 fn pla(self: *Cpu) !void {
-    self.a = try self.stackPop();
+    const result = try self.stackPop();
+    self.a = result;
+
+    self.handleZeroFlagStatus(result);
+    self.handleNegativeFlagStatus(result);
 }
 
 fn plp(self: *Cpu) !void {
