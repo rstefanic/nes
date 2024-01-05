@@ -46,3 +46,20 @@ palette: Palette = Palette.default(),
 buffer: [256 * 240]u8 = [_]u8{0x2C} ** (256 * 240),
 
 
+const PpuMemoryAccessError = error{
+    InvalidMemoryAddress,
+    MissingCartridge,
+};
+
+fn read(self: *Ppu, address: u16) !u8 {
+    // Address space for accessing the left/right pattern table
+    if (address >= 0x0000 and address <= 0x1FFF) {
+        if (self.console.cartridge) |cartridge| {
+            return cartridge.chr_rom_bank[address];
+        } else {
+            return PpuMemoryAccessError.MissingCartridge;
+        }
+    }
+
+    return PpuMemoryAccessError.InvalidMemoryAddress;
+}
