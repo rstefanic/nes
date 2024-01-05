@@ -770,7 +770,11 @@ fn pha(self: *Cpu) !void {
 }
 
 fn php(self: *Cpu) !void {
-    try self.stackPush(@bitCast(self.status));
+    // NOTE: The break flag is always set whenever the transfer was caused
+    // by software (e.g. PHP or BRK). See here for more information:
+    // https://www.masswerk.at/6502/6502_instruction_set.html#break-flag
+    const status = @as(u8, @bitCast(self.status)) | 0b00010000;
+    try self.stackPush(status);
 }
 
 fn pla(self: *Cpu) !void {
@@ -782,7 +786,11 @@ fn pla(self: *Cpu) !void {
 }
 
 fn plp(self: *Cpu) !void {
-    self.status = @bitCast(try self.stackPop());
+    // NOTE: The break flag is masked and cleared whenever transferred from the stack
+    // to the status register from a PLP/RTI call. See here for more information:
+    // https://www.masswerk.at/6502/6502_instruction_set.html#break-flag
+    const status: u8 = try self.stackPop() & 0b11001111;
+    self.status = @bitCast(status);
 }
 
 fn rti(self: *Cpu) !void {
@@ -791,7 +799,11 @@ fn rti(self: *Cpu) !void {
 }
 
 fn brk(self: *Cpu) !void {
-    try self.stackPush(@bitCast(self.status));
+    // NOTE: The break flag is always set whenever the transfer was caused
+    // by software (e.g. PHP or BRK). See here for more information:
+    // https://www.masswerk.at/6502/6502_instruction_set.html#break-flag
+    const status = @as(u8, @bitCast(self.status)) | 0b00010000;
+    try self.stackPush(status);
 
     // Push the current pc in little endian format
     try self.stackPush(@truncate(self.pc >> 8));
