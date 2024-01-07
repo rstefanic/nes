@@ -433,8 +433,11 @@ fn txs(self: *Cpu) !void {
 }
 
 fn tsx(self: *Cpu) !void {
-    const value = try self.stackPop();
+    const value = self.sp;
     self.x = value;
+
+    self.handleZeroFlagStatus(value);
+    self.handleNegativeFlagStatus(value);
 }
 
 fn adc(self: *Cpu, address: u16) !void {
@@ -1171,13 +1174,12 @@ test "TXS" {
 test "TSX" {
     var console = Console{};
     var cpu = Cpu{ .console = &console };
-    const expected_byte: u8 = 0xFF;
-    try cpu.stackPush(expected_byte);
+    cpu.sp = 0x02;
 
     try cpu.write(0x0000, 0xBA); // TSX Instruction
     try cpu.step();
 
-    try testing.expectEqual(expected_byte, cpu.x);
+    try testing.expectEqual(cpu.sp, cpu.x);
 }
 
 test "ADC Immediate" {
