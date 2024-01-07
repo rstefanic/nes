@@ -477,14 +477,14 @@ fn sbc(self: *Cpu, address: u16) !void {
     // If it's clear, it means a borrow did happen.
     // If it's set, it means a borrow did not happen.
     const carry: u1 = if (self.status.carry) 1 else 0;
-    var diff: u16 = @as(u16, a) -% @as(u16, value) - ~carry;
-    const result: u8 = @truncate(diff);
+    const diff = @subWithOverflow(a, value);
+    const result = @subWithOverflow(diff[0], ~carry);
 
-    self.a = result;
-    self.status.carry = diff > 0xFF;
-    self.status.overflow = (a ^ diff) & (value ^ diff) & 0x80 <= 0;
-    self.handleZeroFlagStatus(result);
-    self.handleNegativeFlagStatus(result);
+    self.a = result[0];
+    self.status.carry = !(result[1] == 1 or diff[1] == 1);
+    self.status.overflow = (a ^ value) & (a ^ result[0]) & 0x80 == 0x80;
+    self.handleZeroFlagStatus(result[0]);
+    self.handleNegativeFlagStatus(result[0]);
 }
 
 fn aand(self: *Cpu, address: u16) !void {
