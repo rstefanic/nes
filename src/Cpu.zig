@@ -451,7 +451,7 @@ fn adc(self: *Cpu, address: u16) !void {
 
     self.a = result;
     self.status.carry = sum > 0xFF;
-    self.status.overflow = (a ^ sum) & (value ^ sum) & 0x80 > 0;
+    self.status.overflow = (a ^ sum) & (value ^ sum) & 0x80 == 0x80;
     self.handleZeroFlagStatus(result);
     self.handleNegativeFlagStatus(result);
 }
