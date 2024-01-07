@@ -792,7 +792,10 @@ fn plp(self: *Cpu) !void {
     // NOTE: The break flag is masked and cleared whenever transferred from the stack
     // to the status register from a PLP/RTI call. See here for more information:
     // https://www.masswerk.at/6502/6502_instruction_set.html#break-flag
-    const status: u8 = try self.stackPop() & 0b11001111;
+    //
+    // Bit 5 of the status register is always 1, so we want to ensure it's set here.
+    // Something that wasn't pushed as a status register could be popped here.
+    const status: u8 = (try self.stackPop() & 0b11101111) | 0b00100000;
     self.status = @bitCast(status);
 }
 
@@ -1739,8 +1742,8 @@ test "PLA" {
 test "PLP" {
     var console = Console{};
     var cpu = Cpu{ .console = &console };
-    const expected_byte: u8 = 0x03;
-    try cpu.stackPush(expected_byte);
+    const expected_byte: u8 = 0x23; // We always expect bit 5 to be set, even though we're popping the value 0x03.
+    try cpu.stackPush(0x03);
 
     try cpu.write(0x0000, 0x28); // PLP Instruction
     try cpu.step();
@@ -1758,7 +1761,7 @@ test "PLP" {
 test "RTI" {
     var console = Console{};
     var cpu = Cpu{ .console = &console };
-    const expected_stack_reg: u8 = 0x03;
+    const expected_stack_reg: u8 = 0x23; // Bit 5 will always be set on the Status Register, even though we're popping 0x03.
     const expected_address: u16 = 0x1000;
     try cpu.stackPush(0x10); // First push the address in little endian
     try cpu.stackPush(0x00);
