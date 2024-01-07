@@ -429,7 +429,8 @@ fn tya(self: *Cpu) void {
 }
 
 fn txs(self: *Cpu) !void {
-    try self.stackPush(self.x);
+    const value = self.x;
+    self.sp = value;
 }
 
 fn tsx(self: *Cpu) !void {
@@ -1168,7 +1169,7 @@ test "TXS" {
     try cpu.write(0x0000, 0x9A); // TXS Instruction
     try cpu.step();
 
-    try testing.expectEqual(expected_byte, try cpu.stackPop());
+    try testing.expectEqual(expected_byte, cpu.sp);
 }
 
 test "TSX" {
