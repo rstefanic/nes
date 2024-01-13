@@ -757,9 +757,11 @@ fn bne(self: *Cpu, address: u16, additional_cycles: *u2) void {
 }
 
 fn jsr(self: *Cpu, address: u16) !void {
-    // Push the current address onto the stack
-    try self.stackPush(@truncate(self.pc >> 8));
-    try self.stackPush(@truncate(self.pc & 0x00FF));
+    // Push the address of the JSR instruction + 2 (i.e. the third byte of the
+    // JSR instruction). RTS pulls the address from the stack and adds one to it.
+    const return_address = self.pc - 1;
+    try self.stackPush(@truncate(return_address >> 8));
+    try self.stackPush(@truncate(return_address & 0x00FF));
 
     self.pc = address;
 }
@@ -769,7 +771,7 @@ fn rts(self: *Cpu) !void {
     const hi = try self.stackPop();
     const stack_addr = makeWord(hi, lo);
 
-    self.pc = stack_addr;
+    self.pc = stack_addr + 1;
 }
 
 fn pha(self: *Cpu) !void {
