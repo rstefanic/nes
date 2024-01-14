@@ -242,9 +242,9 @@ fn execute(self: *Cpu, ins: Instruction) !void {
             // The operand + X is a lookup address on the zero-page. This address contains the
             // 16 bit effective address. This lookup address should never overflow onto the
             // next page, so we'll mod the result by 0xFF to stay on the zero-page.
-            const byte = (try self.fetch() + self.x) % 0xFF;
+            const byte = try self.fetch() +% self.x;
             const lo = try self.read(makeWord(0x00, byte));
-            const hi = try self.read(makeWord(0x00, byte + 1));
+            const hi = try self.read(makeWord(0x00, byte +% 1));
             address = makeWord(hi, lo);
         },
         .IndirectIndexed => {
