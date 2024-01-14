@@ -1679,6 +1679,7 @@ test "JSR" {
     var console = Console{};
     var cpu = Cpu{ .console = &console };
     const expected_address: u16 = 0x3000;
+    const expected_stack_address: u16 = 0x1002;
     cpu.pc = 0x1000;
 
     try cpu.write(0x1000, 0x20); // JSR Instruction
@@ -1688,17 +1689,17 @@ test "JSR" {
 
     try testing.expectEqual(expected_address, cpu.pc);
 
-    // Verify the address pushed to the stack
+    // Verify the address was pushed to the stack correctly
     const lo = try cpu.stackPop();
     const hi = try cpu.stackPop();
     const stack_addr = makeWord(hi, lo);
-    try testing.expectEqual(@as(u16, 0x1003), stack_addr);
+    try testing.expectEqual(expected_stack_address, stack_addr);
 }
 
 test "RTS" {
     var console = Console{};
     var cpu = Cpu{ .console = &console };
-    const expected_address: u16 = 0x1000;
+    const expected_address: u16 = 0x1001;
     try cpu.stackPush(0x10);
     try cpu.stackPush(0x00);
 
@@ -1767,7 +1768,7 @@ test "RTI" {
     var console = Console{};
     var cpu = Cpu{ .console = &console };
     const expected_stack_reg: u8 = 0x23; // Bit 5 will always be set on the Status Register, even though we're popping 0x03.
-    const expected_address: u16 = 0x1000;
+    const expected_pc_address: u16 = 0x1001;
     try cpu.stackPush(0x10); // First push the address in little endian
     try cpu.stackPush(0x00);
     try cpu.stackPush(0x03); // Next push the status register
@@ -1776,7 +1777,7 @@ test "RTI" {
     try cpu.step();
 
     try testing.expectEqual(expected_stack_reg, @as(u8, @bitCast(cpu.status)));
-    try testing.expectEqual(expected_address, cpu.pc);
+    try testing.expectEqual(expected_pc_address, cpu.pc);
 }
 
 test "NOP" {
