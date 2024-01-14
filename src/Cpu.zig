@@ -807,7 +807,11 @@ fn plp(self: *Cpu) !void {
 
 fn rti(self: *Cpu) !void {
     try self.plp();
-    try self.rts();
+
+    const lo = try self.stackPop();
+    const hi = try self.stackPop();
+    const stack_addr = makeWord(hi, lo);
+    self.pc = stack_addr;
 }
 
 fn brk(self: *Cpu) !void {
@@ -1768,7 +1772,7 @@ test "RTI" {
     var console = Console{};
     var cpu = Cpu{ .console = &console };
     const expected_stack_reg: u8 = 0x23; // Bit 5 will always be set on the Status Register, even though we're popping 0x03.
-    const expected_pc_address: u16 = 0x1001;
+    const expected_pc_address: u16 = 0x1000;
     try cpu.stackPush(0x10); // First push the address in little endian
     try cpu.stackPush(0x00);
     try cpu.stackPush(0x03); // Next push the status register
