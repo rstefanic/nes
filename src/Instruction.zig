@@ -146,7 +146,7 @@ pub fn decode(byte: u8) error{InvalidInstruction}!Instruction {
         0x60 => .{ .opcode = .RTS, .mode = .Implied, .cycles = 6 },
         0x61 => .{ .opcode = .ADC, .mode = .IndexedIndirect, .cycles = 6 },
         0x65 => .{ .opcode = .ADC, .mode = .ZeroPage, .cycles = 3 },
-        0x66 => .{ .opcode = .ROR, .mode = .ZeroPage, .cycles = 6 },
+        0x66 => .{ .opcode = .ROR, .mode = .ZeroPage, .cycles = 5 },
         0x68 => .{ .opcode = .PLA, .mode = .Implied, .cycles = 4 },
         0x69 => .{ .opcode = .ADC, .mode = .Immediate, .cycles = 2 },
         0x6A => .{ .opcode = .ROR, .mode = .Accumulator, .cycles = 2 },
