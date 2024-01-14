@@ -252,13 +252,14 @@ fn execute(self: *Cpu, ins: Instruction) !void {
             // the pointer to mimic indexing giving us the effective address.
             const byte = try self.fetch();
             const lo = try self.read(makeWord(0x00, byte));
-            const hi = try self.read(makeWord(0x00, byte + 1));
+            const hi = try self.read(makeWord(0x00, byte +% 1));
             const effective_address = makeWord(hi, lo);
-            if (addressPagesDiffer(effective_address, effective_address + self.y)) {
+            const y_indexed_address = effective_address +% self.y;
+            if (addressPagesDiffer(effective_address, y_indexed_address)) {
                 additional_cycles += 1;
             }
 
-            address = effective_address + self.y;
+            address = y_indexed_address;
         },
     }
 
