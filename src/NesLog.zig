@@ -1,8 +1,11 @@
 const NesLog = @This();
 
+const Cartridge = @import("Cartridge.zig");
+const Console = @import("Console.zig");
 const Cpu = @import("Cpu.zig");
 
 const std = @import("std");
+const testing = std.testing;
 
 const NesLogStep = struct {
     a: u8,
@@ -76,4 +79,53 @@ inline fn parseSpReg(data: []const u8) !u8 {
 
 inline fn parseCycles(data: []const u8) !u64 {
     return try std.fmt.parseInt(u64, data[42..], 10);
+}
+
+test "The CPU output should match the NES Log" {
+    var neslog = NesLog.init();
+    var console = Console{};
+    var cpu = Cpu{ .console = &console };
+    var rom = "roms/nestest.nes".*;
+    var cartridge: Cartridge = try Cartridge.init(testing.allocator, &rom);
+    defer cartridge.deinit();
+
+    console.connectCpu(&cpu);
+    console.connectCartridge(&cartridge);
+    try cpu.reset();
+
+    // The nestest rom starts at 0xC000, so we'll
+    // override whatever was set during reset.
+    cpu.pc = 0xC000;
+
+    _ = try neslog.next();
+    try console.step();
+
+    while (try neslog.next()) |log| {
+        const same = log.compare(&cpu);
+        if (!same) { // Report an error and fail the test
+            std.debug.print("\nNESLOG: Incorrect CPU state on line {d}\n", .{neslog.current_line_num});
+            std.debug.print("\tLOG: A:{X} X:{X} Y:{X} P:{X} SP:{X} CYC:{d}\n", .{
+                log.a,
+                log.x,
+                log.y,
+                log.p,
+                log.sp,
+                log.cycles,
+            });
+            std.debug.print("\tCPU: A:{X} X:{X} Y:{X} P:{X} SP:{X} CYC:{d}\n", .{
+                cpu.a,
+                cpu.x,
+                cpu.y,
+                @as(u8, @bitCast(cpu.status)),
+                cpu.sp,
+                cpu.cycles,
+            });
+
+            try testing.expect(false);
+        }
+
+        try console.step();
+    }
+
+    try testing.expect(true); // Hooray! It's all good!
 }
