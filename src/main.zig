@@ -302,3 +302,7 @@ fn drawText(allocator: std.mem.Allocator, comptime fmt: []const u8, args: anytyp
     var c_buf: [*c]const u8 = @ptrCast(buf); // Cast it to a C style pointer so raylib can use it
     raylib.DrawText(c_buf, options.pos_x, options.pos_y, options.font_size, options.color);
 }
+
+test {
+    std.testing.refAllDecls(@This());
+}
