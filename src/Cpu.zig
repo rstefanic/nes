@@ -32,8 +32,8 @@ status: packed struct(u8) {
 
 pub fn reset(self: *Cpu) !void {
     if (self.console.cartridge) |_| {
-        const lo_byte = try self.console.read(0xFFFC);
-        const hi_byte = try self.console.read(0xFFFD);
+        const lo_byte = try self.read(0xFFFC);
+        const hi_byte = try self.read(0xFFFD);
         self.pc = makeWord(hi_byte, lo_byte);
     }
 
