@@ -161,7 +161,7 @@ pub fn decode(byte: u8) error{InvalidInstruction}!Instruction {
         0x78 => .{ .opcode = .SEI, .mode = .Implied, .cycles = 2 },
         0x79 => .{ .opcode = .ADC, .mode = .AbsoluteY, .cycles = 4 },
         0x7D => .{ .opcode = .ADC, .mode = .AbsoluteX, .cycles = 4 },
-        0x7E => .{ .opcode = .ROR, .mode = .Absolute, .cycles = 6 },
+        0x7E => .{ .opcode = .ROR, .mode = .Absolute, .cycles = 7 },
 
         0x81 => .{ .opcode = .STA, .mode = .IndexedIndirect, .cycles = 6 },
         0x84 => .{ .opcode = .STY, .mode = .ZeroPage, .cycles = 3 },
