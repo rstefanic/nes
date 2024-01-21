@@ -233,9 +233,14 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .Indirect => {
             const lo = try self.fetch();
             const hi = try self.fetch();
-            const indirect_addr = makeWord(hi, lo);
-            const effective_lo = try self.read(indirect_addr);
-            const effective_hi = try self.read(indirect_addr + 1);
+            const indirect_addr_lo = makeWord(hi, lo);
+
+            // There's a bug in the 6502 where the CPU won't cross a page
+            // boundry when reading the indirect address; so we'll just add 1
+            // to the low byte to ensure we don't cross a page boundry.
+            const indirect_addr_hi = makeWord(hi, lo +% 1);
+            const effective_lo = try self.read(indirect_addr_lo);
+            const effective_hi = try self.read(indirect_addr_hi);
             address = makeWord(effective_hi, effective_lo);
         },
         .IndexedIndirect => {
