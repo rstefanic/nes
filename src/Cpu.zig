@@ -194,25 +194,48 @@ fn execute(self: *Cpu, ins: Instruction) !void {
             const hi = try self.fetch();
             address = makeWord(hi, lo);
         },
-        .AbsoluteX => {
+        .AbsoluteX => absolute_x: {
             const lo = try self.fetch();
             const hi = try self.fetch();
             const effective_address = makeWord(hi, lo);
-            if (addressPagesDiffer(effective_address, effective_address + self.x)) {
-                additional_cycles += 1;
-            }
+            const abs_addr = effective_address +% self.x;
+            address = abs_addr;
 
-            address = effective_address + self.x;
+            // As an optimization, the 6502 will load the Absolute X value from
+            // memory as soon as the first part of the addition is complete as
+            // an optimization that can save a cycle. If the page boundry is
+            // crossed, then the value is fetched again and an extra cycle is
+            // required; however, for write operations involving this
+            // addressing mode (i.e. the operations listed below), the address
+            // calcluation is *always* completed since this optimization could
+            // result in storing data at the wrong address. Therefore, the
+            // following instructions do not incur an extra page boundry
+            // penalty since it's already been accounted for.
+            switch (ins.opcode) {
+                .ASL, .DEC, .INC, .LSR, .ROL, .ROR, .STA => break :absolute_x,
+                else => {
+                    if (addressPagesDiffer(effective_address, abs_addr)) {
+                        additional_cycles += 1;
+                    }
+                },
+            }
         },
-        .AbsoluteY => {
+        .AbsoluteY => absolute_y: {
             const lo = try self.fetch();
             const hi = try self.fetch();
             const effective_address = makeWord(hi, lo);
-            if (addressPagesDiffer(effective_address, effective_address + self.y)) {
-                additional_cycles += 1;
+            const abs_addr = effective_address +% self.y;
+            address = abs_addr;
+
+            // STA in this address mode already accounts for the cycle penalty.
+            // This penalty is encoded in the instruction's cycle count.
+            if (ins.opcode == .STA) {
+                break :absolute_y;
             }
 
-            address = effective_address + self.y;
+            if (addressPagesDiffer(effective_address, abs_addr)) {
+                additional_cycles += 1;
+            }
         },
         .ZeroPage => {
             const lo = try self.fetch();
@@ -252,7 +275,7 @@ fn execute(self: *Cpu, ins: Instruction) !void {
             const hi = try self.read(makeWord(0x00, byte +% 1));
             address = makeWord(hi, lo);
         },
-        .IndirectIndexed => {
+        .IndirectIndexed => indirect_indexed: {
             // The operand is a zero-page address to a pointer. Y is added to
             // the pointer to mimic indexing giving us the effective address.
             const byte = try self.fetch();
@@ -260,11 +283,17 @@ fn execute(self: *Cpu, ins: Instruction) !void {
             const hi = try self.read(makeWord(0x00, byte +% 1));
             const effective_address = makeWord(hi, lo);
             const y_indexed_address = effective_address +% self.y;
+            address = y_indexed_address;
+
+            // STA in this address mode already accounts for the cycle penalty.
+            // This penalty is encoded in the instruction's cycle count.
+            if (ins.opcode == .STA) {
+                break :indirect_indexed;
+            }
+
             if (addressPagesDiffer(effective_address, y_indexed_address)) {
                 additional_cycles += 1;
             }
-
-            address = y_indexed_address;
         },
     }
 
