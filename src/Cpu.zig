@@ -222,13 +222,13 @@ fn execute(self: *Cpu, ins: Instruction) !void {
             const byte = try self.fetch();
             // The address here needs to wrap around
             // and always remain on the Zero Page.
-            address = (byte + self.x) % 255;
+            address = byte +% self.x;
         },
         .ZeroPageY => {
             const byte = try self.fetch();
             // The address here needs to wrap around
             // and always remain on the Zero Page.
-            address = (byte + self.y) % 255;
+            address = byte +% self.y;
         },
         .Indirect => {
             const lo = try self.fetch();
