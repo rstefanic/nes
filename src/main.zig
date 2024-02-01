@@ -53,6 +53,16 @@ pub fn main() !void {
     raylib.InitWindow(WIDTH, HEIGHT, "NES");
     defer raylib.CloseWindow();
 
+    // Create a texture so that we can use to draw the NES output to
+    const img = raylib.GenImageColor(256, 240, raylib.BLACK);
+    defer raylib.UnloadImage(img);
+    var texture = raylib.LoadTextureFromImage(img);
+    defer raylib.UnloadTexture(texture);
+    raylib.SetTextureFilter(texture, raylib.TEXTURE_FILTER_BILINEAR);
+
+    const output_display = raylib.Rectangle{ .x = 5, .y = 5, .width = 256 * 2, .height = 240 * 2 };
+    var output_buffer: [256 * 240]raylib.Color = [_]raylib.Color{raylib.BLACK} ** (256 * 240);
+
     while (!raylib.WindowShouldClose()) {
         raylib.BeginDrawing();
         defer raylib.EndDrawing();
@@ -119,31 +129,19 @@ pub fn main() !void {
         // Draw PPU Buffer
         var i: usize = 0;
         while (i < ppu.buffer.len) : (i += 1) {
-
-            // The NES Display buffer is 256 x 240. We need to check if we've
-            // drawn 256 pixels across here, and if we have, jump to the next
-            // line to start the next row of pixels.
-            //
-            // Since 256 x 240 is kind of small, we're going to double the the
-            // pixel display and draw a 2 x 2 rectangle for every pixel in the
-            // PPU buffer.
-            if ((i % 256) == 0) {
-                y += 2;
-                x = x_start;
-            } else {
-                x += 2;
-            }
-
             const pal_code = ppu.buffer[i];
             const color = ppu.palette.colors[pal_code];
 
-            raylib.DrawRectangle(x, y, 2, 2, raylib.Color{
+            output_buffer[i] = raylib.Color{
                 .r = color.r,
                 .g = color.g,
                 .b = color.b,
                 .a = 255, // alpha
-            });
+            };
         }
+
+        raylib.UpdateTexture(texture, &output_buffer);
+        raylib.DrawTextureRec(texture, output_display, raylib.Vector2{ .x = 5, .y = 5 }, raylib.WHITE);
 
         // Draw Left/Right Pattern Table
         pattern_table: {
