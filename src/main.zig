@@ -53,17 +53,96 @@ pub fn main() !void {
     raylib.InitWindow(WIDTH, HEIGHT, "NES");
     defer raylib.CloseWindow();
 
+    // Output Display Texture Setup
     const output_display = raylib.Rectangle{ .x = 0, .y = 0, .width = 256 * 2, .height = 240 * 2 };
-
     const output_img = raylib.GenImageColor(256, 240, raylib.BLACK);
     defer raylib.UnloadImage(output_img);
-
     var output_texture = raylib.LoadTextureFromImage(output_img);
     defer raylib.UnloadTexture(output_texture);
     raylib.SetTextureFilter(output_texture, raylib.TEXTURE_FILTER_BILINEAR);
-
     var output_buffer: [256 * 240]raylib.Color = [_]raylib.Color{raylib.BLACK} ** (256 * 240);
 
+    // Left Pattern Table Texture Setup
+    const left_pattern_table_display = raylib.Rectangle{ .x = 0, .y = 0, .width = 128, .height = 128 };
+    const left_pattern_table_img = raylib.GenImageColor(128, 128, raylib.RED);
+    defer raylib.UnloadImage(left_pattern_table_img);
+    var left_pattern_table_texture = raylib.LoadTextureFromImage(left_pattern_table_img);
+    defer raylib.UnloadTexture(left_pattern_table_texture);
+    var left_pattern_table_buffer: [256 * 64]raylib.Color = [_]raylib.Color{raylib.BLUE} ** (256 * 64);
+
+    // Right Pattern Table Texture Setup
+    const right_pattern_table_display = raylib.Rectangle{ .x = 0, .y = 0, .width = 128, .height = 128 };
+    const right_pattern_table_img = raylib.GenImageColor(128, 128, raylib.BLACK);
+    defer raylib.UnloadImage(right_pattern_table_img);
+    var right_pattern_table_tex = raylib.LoadTextureFromImage(right_pattern_table_img);
+    defer raylib.UnloadTexture(right_pattern_table_tex);
+    var right_pattern_table_buffer: [256 * 64]raylib.Color = [_]raylib.Color{raylib.GREEN} ** (256 * 64);
+
+    // Build Left/Right Pattern Table Textures
+    build_pattern_tables: {
+        const colors: [4]raylib.Color = [_]raylib.Color{
+            raylib.WHITE,
+            raylib.BLUE,
+            raylib.GRAY,
+            raylib.BLACK,
+        };
+
+        if (cartridge) |c| {
+            // If the CHR ROM bank is empty, then there's nothing to draw :(
+            if (c.chr_rom_bank.len == 0) {
+                break :build_pattern_tables;
+            }
+
+            const tile_height = 8; // Each tile in the pattern table is made up of 8x8 pixels
+            const tile_width = 8;
+            const pt_display_width = 128; // This is the width of the pattern table texture
+            var x: u32 = 0; // x & y here are used to index into the left/right pattern table buffers
+            var y: u32 = 0;
+            var i: usize = 0; // Keeps track of which tile we're looking at in the pattern tables
+
+            // Add each tile from the left pattern table to the corresponding texture. Since the left and right pattern
+            // tables are the same size and they're built in the same way, we can build the right pattern table at
+            // the same time using the same indexes used to access the left pattern table's tiles and buffers.
+            while (i < ppu.left_pattern_table.len) : (i += 1) {
+                if (i > 0) {
+                    // The pattern tables are made up of 16x16 tiles (where each tile is 8x8 pixels).
+                    // For every 16 tiles, we want to start drawing the tiles on the next "row".
+                    if ((i % 16) == 0) {
+                        y += 8;
+                        x = 0;
+                    } else {
+                        x += 8;
+                    }
+                }
+
+                var j: u32 = 0;
+
+                // Go through this tile's pixels and add them to the pattern table buffers.
+                while (j < tile_height) : (j += 1) { // Tile Row
+
+                    var k: u32 = 0;
+                    const tile_row = j * tile_height;
+                    while (k < tile_width) : (k += 1) { // Tile Column
+                        const left_pt_pixel = ppu.left_pattern_table[i][tile_row + k];
+                        const left_pt_color = colors[left_pt_pixel];
+
+                        const right_pt_pixel = ppu.right_pattern_table[i][tile_row + k];
+                        const right_pt_color = colors[right_pt_pixel];
+
+                        const buffer_column = x + k;
+                        const buffer_row = (y + j) * pt_display_width;
+                        const idx = buffer_column + buffer_row;
+
+                        left_pattern_table_buffer[idx] = left_pt_color;
+                        right_pattern_table_buffer[idx] = right_pt_color;
+                    }
+                }
+            }
+
+            raylib.UpdateTexture(left_pattern_table_texture, &left_pattern_table_buffer);
+            raylib.UpdateTexture(right_pattern_table_tex, &right_pattern_table_buffer);
+        }
+    }
 
     while (!raylib.WindowShouldClose()) {
         raylib.BeginDrawing();
@@ -122,12 +201,6 @@ pub fn main() !void {
             }
         }
 
-        const window_padding = 10;
-        const x_start: c_int = 5;
-        const y_start: c_int = 5;
-        var x: c_int = x_start;
-        var y: c_int = y_start;
-
         // Draw PPU Buffer
         var i: usize = 0;
         while (i < ppu.buffer.len) : (i += 1) {
@@ -142,76 +215,14 @@ pub fn main() !void {
             };
         }
 
-
-        // Draw Left/Right Pattern Table
-        pattern_table: {
-            const x_pattern_table_start: c_int = 800;
-            const y_pattern_table_start: c_int = 5;
-
-            x = x_pattern_table_start;
-            y = y_pattern_table_start;
-
-            const colors: [4]raylib.Color = [_]raylib.Color{
-                raylib.WHITE,
-                raylib.BLUE,
-                raylib.GRAY,
-                raylib.BLACK,
-            };
-
-            if (cartridge) |c| {
-
-                // If it's empty, then there's nothing to draw :(
-                if (c.chr_rom_bank.len == 0) {
-                    break :pattern_table;
-                }
-
-                i = 0; // Reset `i`
-                while (i < ppu.left_pattern_table.len) : (i += 1) {
-                    if ((i % 16) == 0) {
-                        y += 8;
-                        x = x_pattern_table_start;
-                    } else {
-                        x += 8;
-                    }
-
-                    var j: u32 = 0;
-                    while (j < 8) : (j += 1) {
-                        var k: u32 = 0;
-                        while (k < 8) : (k += 1) {
-                            const pixel = ppu.left_pattern_table[i][(8 * j) + k];
-                            const color = colors[pixel];
-                            raylib.DrawPixel(x + @as(c_int, @bitCast(k)), y + @as(c_int, @bitCast(j)), color);
-                        }
-                    }
-                }
-
-                y += 5; // More Y padding
-                i = 0; // Reset `i`
-                while (i < ppu.right_pattern_table.len) : (i += 1) {
-                    if ((i % 16) == 0) {
-                        y += 8;
-                        x = x_pattern_table_start;
-                    } else {
-                        x += 8;
-                    }
-
-                    var j: u32 = 0;
-                    while (j < 8) : (j += 1) {
-                        var k: u32 = 0;
-                        while (k < 8) : (k += 1) {
-                            const pixel = ppu.right_pattern_table[i][(8 * j) + k];
-                            const color = colors[pixel];
-                            raylib.DrawPixel(x + @as(c_int, @bitCast(k)), y + @as(c_int, @bitCast(j)), color);
-                        }
-                    }
-                }
-            }
-        }
         raylib.UpdateTexture(output_texture, &output_buffer);
         raylib.DrawTextureRec(output_texture, output_display, raylib.Vector2{ .x = 5, .y = 5 }, raylib.WHITE);
+        raylib.DrawTextureRec(left_pattern_table_texture, left_pattern_table_display, raylib.Vector2{ .x = 800, .y = 5 }, raylib.WHITE);
+        raylib.DrawTextureRec(right_pattern_table_tex, right_pattern_table_display, raylib.Vector2{ .x = 800, .y = 150 }, raylib.WHITE);
 
         // Screen Drawing
         const y_spacing = 42;
+        const window_padding = 10;
         var options: DrawTextOptions = .{
             .pos_x = 530,
             .pos_y = 20,
