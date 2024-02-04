@@ -53,7 +53,7 @@ pub fn main() !void {
     raylib.InitWindow(WIDTH, HEIGHT, "NES");
     defer raylib.CloseWindow();
 
-    const output_display = raylib.Rectangle{ .x = 5, .y = 5, .width = 256 * 2, .height = 240 * 2 };
+    const output_display = raylib.Rectangle{ .x = 0, .y = 0, .width = 256 * 2, .height = 240 * 2 };
 
     const output_img = raylib.GenImageColor(256, 240, raylib.BLACK);
     defer raylib.UnloadImage(output_img);
