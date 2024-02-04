@@ -53,15 +53,17 @@ pub fn main() !void {
     raylib.InitWindow(WIDTH, HEIGHT, "NES");
     defer raylib.CloseWindow();
 
-    // Create a texture so that we can use to draw the NES output to
-    const img = raylib.GenImageColor(256, 240, raylib.BLACK);
-    defer raylib.UnloadImage(img);
-    var texture = raylib.LoadTextureFromImage(img);
-    defer raylib.UnloadTexture(texture);
-    raylib.SetTextureFilter(texture, raylib.TEXTURE_FILTER_BILINEAR);
-
     const output_display = raylib.Rectangle{ .x = 5, .y = 5, .width = 256 * 2, .height = 240 * 2 };
+
+    const output_img = raylib.GenImageColor(256, 240, raylib.BLACK);
+    defer raylib.UnloadImage(output_img);
+
+    var output_texture = raylib.LoadTextureFromImage(output_img);
+    defer raylib.UnloadTexture(output_texture);
+    raylib.SetTextureFilter(output_texture, raylib.TEXTURE_FILTER_BILINEAR);
+
     var output_buffer: [256 * 240]raylib.Color = [_]raylib.Color{raylib.BLACK} ** (256 * 240);
+
 
     while (!raylib.WindowShouldClose()) {
         raylib.BeginDrawing();
@@ -140,8 +142,6 @@ pub fn main() !void {
             };
         }
 
-        raylib.UpdateTexture(texture, &output_buffer);
-        raylib.DrawTextureRec(texture, output_display, raylib.Vector2{ .x = 5, .y = 5 }, raylib.WHITE);
 
         // Draw Left/Right Pattern Table
         pattern_table: {
@@ -207,6 +207,8 @@ pub fn main() !void {
                 }
             }
         }
+        raylib.UpdateTexture(output_texture, &output_buffer);
+        raylib.DrawTextureRec(output_texture, output_display, raylib.Vector2{ .x = 5, .y = 5 }, raylib.WHITE);
 
         // Screen Drawing
         const y_spacing = 42;
