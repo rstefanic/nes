@@ -13,7 +13,17 @@ ppu: ?*Ppu = null,
 memory: [0x800]u8 = std.mem.zeroes([0x800]u8),
 
 pub fn step(self: *Console) !void {
+    const start_cycle_count = self.cpu.?.cycles;
     try self.cpu.?.step();
+    const end_cycle_count = self.cpu.?.cycles;
+
+    // The PPU runs 3 cycles for every CPU cycle
+    var cycles = end_cycle_count - start_cycle_count;
+    while (cycles > 0) : (cycles -= 1) {
+        try self.ppu.?.step();
+        try self.ppu.?.step();
+        try self.ppu.?.step();
+    }
 }
 
 pub fn connectCpu(self: *Console, cpu: *Cpu) void {
