@@ -42,6 +42,7 @@ pub fn main() !void {
     console.connectPpu(&ppu);
     try ppu.setupPatternTables();
     try cpu.reset();
+    try ppu.reset();
 
     var neslog = NesLog.init();
 

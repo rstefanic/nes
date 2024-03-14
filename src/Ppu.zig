@@ -6,6 +6,9 @@ const Console = @import("Console.zig");
 const Palette = @import("Palette.zig");
 const Tile = [64]u2;
 
+const scanlines_per_frame = 262;
+const dots_per_scanline = 341;
+
 console: *Console,
 
 ppuctrl: packed struct(u8) {
@@ -43,6 +46,9 @@ ppuaddr: u8 = 0,
 ppudata: u8 = 0,
 oamdma: u8 = 0,
 
+scanlines: i16 = 0,
+dots: i16 = 0,
+
 palette: Palette = Palette.default(),
 buffer: [256 * 240]u8 = [_]u8{0x2C} ** (256 * 240),
 
@@ -50,10 +56,28 @@ buffer: [256 * 240]u8 = [_]u8{0x2C} ** (256 * 240),
 left_pattern_table: [256]Tile = undefined,
 right_pattern_table: [256]Tile = undefined,
 
+pub fn reset(self: *Ppu) !void {
+    // A CPU reset takes 7 cycles. Since the PPU runs 3 cycles
+    // per CPU cycle, we'll set the dots here to 21 to mimic that.
+    self.dots = 21;
+}
+
 const PpuMemoryAccessError = error{
     InvalidMemoryAddress,
     MissingCartridge,
 };
+
+pub fn step(self: *Ppu) !void {
+    self.dots += 1;
+    if (self.dots >= dots_per_scanline) {
+        self.dots = 0;
+        self.scanlines += 1;
+
+        if (self.scanlines >= scanlines_per_frame) {
+            self.scanlines = -1;
+        }
+    }
+}
 
 fn read(self: *Ppu, address: u16) !u8 {
     // Address space for accessing the left/right pattern table
