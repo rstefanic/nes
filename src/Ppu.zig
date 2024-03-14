@@ -42,9 +42,15 @@ ppustatus: packed struct(u8) {
 oamaddr: u8 = 0,
 oamdata: u8 = 0,
 ppuscroll: u8 = 0,
-ppuaddr: u8 = 0,
+ppuaddr: u16 = 0,
 ppudata: u8 = 0,
 oamdma: u8 = 0,
+
+// Internal registers
+v: u8 = 0,
+t: u8 = 0,
+x: u8 = 0,
+w: bool = true, // write latch
 
 scanlines: i16 = 0,
 dots: i16 = 0,
@@ -60,6 +66,56 @@ pub fn reset(self: *Ppu) !void {
     // A CPU reset takes 7 cycles. Since the PPU runs 3 cycles
     // per CPU cycle, we'll set the dots here to 21 to mimic that.
     self.dots = 21;
+}
+
+pub inline fn readPpustatus(self: *Ppu) u8 {
+    self.w = false; // clears the address latch bit
+    self.ppustatus.vertical_blank = false; // clears the vertical blank flag
+    return @bitCast(self.ppustatus);
+}
+
+pub inline fn readOamdata(self: *Ppu) u8 {
+    return self.oamdata;
+}
+
+pub inline fn readPpudata(self: *Ppu) !u8 {
+    return try self.read(self.ppuaddr);
+}
+
+pub inline fn writePpuctrl(self: *Ppu, value: u8) void {
+    self.ppuctrl = @bitCast(value);
+}
+
+pub inline fn writePpumask(self: *Ppu, value: u8) void {
+    self.ppumask = @bitCast(value);
+}
+
+pub inline fn writeOamaddr(self: *Ppu, value: u8) void {
+    self.oamaddr = value;
+}
+
+pub inline fn writeOamdata(self: *Ppu, value: u8) void {
+    self.oamdata = value;
+}
+
+pub inline fn writePpuscroll(self: *Ppu, value: u8) void {
+    self.ppuscroll = value;
+}
+
+pub inline fn writePpuaddr(self: *Ppu, value: u8) void {
+    if (self.w) { // first write
+        self.ppuaddr = @as(u16, value) << 8;
+    } else { // second write
+        self.ppuaddr += value;
+    }
+
+    self.w = !self.w;
+}
+
+pub inline fn writePpudata(self: *Ppu, value: u8) !void {
+    _ = value;
+    _ = self;
+    @panic("Write to ppudata register not yet implemented");
 }
 
 const PpuMemoryAccessError = error{

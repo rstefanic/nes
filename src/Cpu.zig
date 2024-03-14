@@ -63,6 +63,8 @@ const StackError = error{
 
 const CpuMemoryAccessError = error{
     InvalidMemoryAddress,
+    InvalidPpuReadAddress,
+    InvalidPpuWriteAddress,
     MissingCartridge,
 };
 
@@ -74,14 +76,10 @@ fn read(self: *Cpu, address: u16) !u8 {
         // Read a PPU register
         if (self.console.ppu) |ppu| {
             return switch (address & 0x0007) {
-                0 => @bitCast(ppu.ppuctrl),
-                1 => @bitCast(ppu.ppumask),
-                2 => @bitCast(ppu.ppustatus),
-                3 => ppu.oamaddr,
-                4 => ppu.oamdata,
-                5 => ppu.ppuscroll,
-                6 => ppu.ppuaddr,
-                else => ppu.ppudata,
+                2 => ppu.readPpustatus(),
+                4 => ppu.readOamdata(),
+                7 => ppu.readPpudata(),
+                else => CpuMemoryAccessError.InvalidPpuReadAddress,
             };
         }
     } else if (address >= 0x8000 and address <= 0xFFFF) {
@@ -104,14 +102,14 @@ fn write(self: *Cpu, address: u16, value: u8) !void {
         // Write to a PPU register
         if (self.console.ppu) |ppu| {
             switch (address & 0x0007) {
-                0 => ppu.ppuctrl = @bitCast(value),
-                1 => ppu.ppumask = @bitCast(value),
-                2 => ppu.ppustatus = @bitCast(value),
-                3 => ppu.oamaddr = value,
-                4 => ppu.oamdata = value,
-                5 => ppu.ppuscroll = value,
-                6 => ppu.ppuaddr = value,
-                else => ppu.ppudata = value,
+                0 => ppu.writePpuctrl(value),
+                1 => ppu.writePpumask(value),
+                3 => ppu.writeOamaddr(value),
+                4 => ppu.writeOamdata(value),
+                5 => ppu.writePpuscroll(value),
+                6 => ppu.writePpuaddr(value),
+                7 => ppu.writePpudata(value),
+                else => return CpuMemoryAccessError.InvalidPpuWriteAddress,
             }
         }
         return;
