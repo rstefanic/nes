@@ -52,7 +52,7 @@ t: u8 = 0,
 x: u8 = 0,
 w: bool = true, // write latch
 
-scanlines: i16 = 0,
+scanlines: i16 = -1,
 dots: i16 = 0,
 
 palette: Palette = Palette.default(),
