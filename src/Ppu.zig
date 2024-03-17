@@ -172,7 +172,14 @@ fn read(self: *Ppu, address: u16) !u8 {
 }
 
 fn write(self: *Ppu, address: u16, value: u8) !void {
-    if (address >= 0x2000 and address <= 0x3000) {
+    if (address >= 0x0000 and address <= 0x1FFF) {
+        if (self.console.cartridge) |cartridge| {
+            cartridge.chr_rom_bank[address] = value;
+            return;
+        } else {
+            return PpuMemoryAccessError.MissingCartridge;
+        }
+    } else if (address >= 0x2000 and address <= 0x3000) {
         if (self.console.cartridge) |cartridge| {
             const is_horizontal_arrangement = cartridge.header.flag6.mirroring;
 
