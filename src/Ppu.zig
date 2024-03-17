@@ -57,6 +57,7 @@ dots: i16 = 0,
 
 palette: Palette = Palette.default(),
 buffer: [256 * 240]u8 = [_]u8{0x2C} ** (256 * 240),
+nametables: [2 * 1024]u8 = [_]u8{0} ** (2 * 1024),
 
 // Pattern Tables define the raw image data
 left_pattern_table: [256]Tile = undefined,
@@ -140,6 +141,59 @@ fn read(self: *Ppu, address: u16) !u8 {
     if (address >= 0x0000 and address <= 0x1FFF) {
         if (self.console.cartridge) |cartridge| {
             return cartridge.chr_rom_bank[address];
+        } else {
+            return PpuMemoryAccessError.MissingCartridge;
+        }
+    } else if (address >= 0x2000 and address <= 0x3000) {
+        if (self.console.cartridge) |cartridge| {
+            const is_horizontal_arrangement = cartridge.header.flag6.mirroring;
+
+            // horizontal arrangement, vertically mirrored
+            if (is_horizontal_arrangement) {
+                if ((address >= 0x2000 and address <= 0x23FF) or (address >= 0x2800 and address <= 0x2BFF)) {
+                    return self.nametables[address & 0x07FF];
+                }
+
+                return self.nametables[address & 0x0FFF];
+            }
+
+            // vertical arrangement, horizontally mirrored
+            if (address >= 0x2000 and address <= 0x27FF) {
+                return self.nametables[address & 0x07FF];
+            }
+
+            return self.nametables[address & 0x0FFF];
+        } else {
+            return PpuMemoryAccessError.MissingCartridge;
+        }
+    }
+
+    return PpuMemoryAccessError.InvalidMemoryAddress;
+}
+
+fn write(self: *Ppu, address: u16, value: u8) !void {
+    if (address >= 0x2000 and address <= 0x3000) {
+        if (self.console.cartridge) |cartridge| {
+            const is_horizontal_arrangement = cartridge.header.flag6.mirroring;
+
+            // horizontal arrangement, vertically mirrored
+            if (is_horizontal_arrangement) {
+                if ((address >= 0x2000 and address <= 0x23FF) or (address >= 0x2800 and address <= 0x2BFF)) {
+                    self.nametables[address & 0x07FF] = value;
+                    return;
+                }
+
+                self.nametables[address & 0x0FFF] = value;
+                return;
+            }
+
+            // vertical arrangement, horizontally mirrored
+            if (address >= 0x2000 and address <= 0x27FF) {
+                self.nametables[address & 0x07FF] = value;
+                return;
+            }
+
+            self.nametables[address & 0x0FFF] = value;
         } else {
             return PpuMemoryAccessError.MissingCartridge;
         }
