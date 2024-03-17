@@ -57,6 +57,8 @@ dots: i16 = 0,
 
 palette: Palette = Palette.default(),
 buffer: [256 * 240]u8 = [_]u8{0x2C} ** (256 * 240),
+
+palette_ram: [32]u8 = [_]u8{0x00} ** 32,
 nametables: [2 * 1024]u8 = [_]u8{0} ** (2 * 1024),
 
 // Pattern Tables define the raw image data
@@ -166,6 +168,10 @@ fn read(self: *Ppu, address: u16) !u8 {
         } else {
             return PpuMemoryAccessError.MissingCartridge;
         }
+    } else if (address >= 0x3F00 and address <= 0x3FFF) {
+        // Addresses $3F20-$3FFF are mirrors of the first 32 bytes for our palette RAM. So take
+        // the lower 5 bits of the address to index into the palette RAM and mimic the mirroring.
+        return self.palette_ram[address & 0x001F];
     }
 
     return PpuMemoryAccessError.InvalidMemoryAddress;
@@ -204,6 +210,9 @@ fn write(self: *Ppu, address: u16, value: u8) !void {
         } else {
             return PpuMemoryAccessError.MissingCartridge;
         }
+    } else if (address >= 0x3F00 and address <= 0x3FFF) {
+        self.palette_ram[address & 0x001F] = value;
+        return;
     }
 
     return PpuMemoryAccessError.InvalidMemoryAddress;
