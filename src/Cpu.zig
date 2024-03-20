@@ -108,7 +108,7 @@ fn write(self: *Cpu, address: u16, value: u8) !void {
                 4 => ppu.writeOamdata(value),
                 5 => ppu.writePpuscroll(value),
                 6 => ppu.writePpuaddr(value),
-                7 => ppu.writePpudata(value),
+                7 => try ppu.writePpudata(value),
                 else => return CpuMemoryAccessError.InvalidPpuWriteAddress,
             }
         }

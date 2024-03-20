@@ -13,7 +13,7 @@ console: *Console,
 
 ppuctrl: packed struct(u8) {
     nametable_addr: u2 = 0,
-    i: bool = false,
+    i: bool = false, // VRAM address Increment -- false adds 1, true adds 32
     s: bool = false,
     b: bool = false,
     h: bool = false,
@@ -51,6 +51,7 @@ v: u8 = 0,
 t: u8 = 0,
 x: u8 = 0,
 w: bool = true, // write latch
+ppudata_buffer: u8 = 0,
 
 scanlines: i16 = -1,
 dots: i16 = 0,
@@ -82,7 +83,17 @@ pub inline fn readOamdata(self: *Ppu) u8 {
 }
 
 pub inline fn readPpudata(self: *Ppu) !u8 {
-    return try self.read(self.ppuaddr);
+    var data = self.ppudata_buffer;
+    self.ppudata_buffer = try self.read(self.ppuaddr);
+
+    // Palette data is returned immediately instead of being
+    // primed on the internal ppudata buffer.
+    if (self.ppuaddr >= 0x3F00 and self.ppuaddr <= 0x3FFF) {
+        data = self.ppudata_buffer;
+    }
+
+    self.ppuaddr += if (self.ppuctrl.i) 32 else 1;
+    return data;
 }
 
 pub inline fn writePpuctrl(self: *Ppu, value: u8) void {
@@ -116,9 +127,8 @@ pub inline fn writePpuaddr(self: *Ppu, value: u8) void {
 }
 
 pub inline fn writePpudata(self: *Ppu, value: u8) !void {
-    _ = value;
-    _ = self;
-    @panic("Write to ppudata register not yet implemented");
+    try self.write(self.ppuaddr, value);
+    self.ppuaddr += if (self.ppuctrl.i) 32 else 1;
 }
 
 const PpuMemoryAccessError = error{
