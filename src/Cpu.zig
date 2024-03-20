@@ -148,7 +148,7 @@ fn stackPop(self: *Cpu) !u8 {
 
 pub fn step(self: *Cpu) !void {
     const byte = try self.fetch();
-    const ins = try Instruction.decode(byte);
+    const ins = Instruction.decode(byte);
     try self.execute(ins);
 }
 
@@ -352,6 +352,9 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .RTI => try self.rti(),
         .BRK => try self.brk(),
         .NOP => self.nop(),
+
+        // Illegal Opcodes
+        .ALR, .ANC, .ANE, .ARR, .DCP, .ISC, .JAM, .LAS, .LAX, .LXA, .RLA, .RRA, .SAX, .SBX, .SHA, .SHX, .SHY, .SLO, .SRE, .TAS, .USBC => self.nop(),
     }
 
     self.cycles += ins.cycles + additional_cycles;
