@@ -37,6 +37,8 @@ pub fn init() NesLog {
 
 pub fn next(self: *NesLog) !?NesLogStep {
     if (self.lines.next()) |line| {
+        if (line.len == 0) return null; // The nestest log ends with a newline; so we'll skip the final line that's empty
+
         self.current_line_num += 1;
 
         const cpu_data_idx_start = 48;
@@ -98,7 +100,7 @@ test "The CPU output should match the NES Log" {
     cpu.pc = 0xC000;
 
     _ = try neslog.next();
-    try console.step();
+    try cpu.step();
 
     while (try neslog.next()) |log| {
         const same = log.compare(&cpu);
@@ -124,7 +126,7 @@ test "The CPU output should match the NES Log" {
             try testing.expect(false);
         }
 
-        try console.step();
+        try cpu.step();
     }
 
     try testing.expect(true); // Hooray! It's all good!
