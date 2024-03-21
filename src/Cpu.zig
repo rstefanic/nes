@@ -210,7 +210,7 @@ fn execute(self: *Cpu, ins: Instruction) !void {
             // following instructions do not incur an extra page boundry
             // penalty since it's already been accounted for.
             switch (ins.opcode) {
-                .ASL, .DEC, .INC, .LSR, .ROL, .ROR, .STA => break :absolute_x,
+                .ASL, .DCP, .DEC, .INC, .ISC, .LSR, .RLA, .ROL, .ROR, .RRA, .SLO, .SRE, .STA => break :absolute_x,
                 else => {
                     if (addressPagesDiffer(effective_address, abs_addr)) {
                         additional_cycles += 1;
@@ -225,14 +225,15 @@ fn execute(self: *Cpu, ins: Instruction) !void {
             const abs_addr = effective_address +% self.y;
             address = abs_addr;
 
-            // STA in this address mode already accounts for the cycle penalty.
+            // The following Opcodes in this address mode already account for the cycle penalty.
             // This penalty is encoded in the instruction's cycle count.
-            if (ins.opcode == .STA) {
-                break :absolute_y;
-            }
-
-            if (addressPagesDiffer(effective_address, abs_addr)) {
-                additional_cycles += 1;
+            switch (ins.opcode) {
+                .ISC, .DCP, .RLA, .RRA, .SLO, .SRE, .STA => break :absolute_y,
+                else => {
+                    if (addressPagesDiffer(effective_address, abs_addr)) {
+                        additional_cycles += 1;
+                    }
+                },
             }
         },
         .ZeroPage => {
@@ -283,14 +284,15 @@ fn execute(self: *Cpu, ins: Instruction) !void {
             const y_indexed_address = effective_address +% self.y;
             address = y_indexed_address;
 
-            // STA in this address mode already accounts for the cycle penalty.
+            // The following Opcodes in this address mode already account for the cycle penalty.
             // This penalty is encoded in the instruction's cycle count.
-            if (ins.opcode == .STA) {
-                break :indirect_indexed;
-            }
-
-            if (addressPagesDiffer(effective_address, y_indexed_address)) {
-                additional_cycles += 1;
+            switch (ins.opcode) {
+                .ISC, .DCP, .RLA, .RRA, .SLO, .SRE, .STA => break :indirect_indexed,
+                else => {
+                    if (addressPagesDiffer(effective_address, y_indexed_address)) {
+                        additional_cycles += 1;
+                    }
+                },
             }
         },
     }
@@ -354,7 +356,17 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .NOP => self.nop(),
 
         // Illegal Opcodes
-        .ALR, .ANC, .ANE, .ARR, .DCP, .ISC, .JAM, .LAS, .LAX, .LXA, .RLA, .RRA, .SAX, .SBX, .SHA, .SHX, .SHY, .SLO, .SRE, .TAS, .USBC => self.nop(),
+        .DCP => try self.dcp(address.?),
+        .ISC => try self.isc(address.?),
+        .LAX => try self.lax(address.?),
+        .RLA => try self.rla(address.?),
+        .RRA => try self.rra(address.?),
+        .SAX => try self.sax(address.?),
+        .SLO => try self.slo(address.?),
+        .SRE => try self.sre(address.?),
+        .USBC => try self.sbc(address.?),
+        // The remaining illegal opcodes will be treated as a NOP
+        .ALR, .ANC, .ANE, .ARR, .JAM, .LAS, .LXA, .SBX, .SHA, .SHX, .SHY, .TAS => self.nop(),
     }
 
     self.cycles += ins.cycles + additional_cycles;
@@ -869,6 +881,55 @@ fn brk(self: *Cpu) !void {
 
 fn nop(self: *Cpu) void {
     _ = self;
+}
+
+fn dcp(self: *Cpu, address: u16) !void {
+    // Decrement the operand in memory
+    const value = try self.read(address) -% 1;
+    try self.write(address, value);
+    try self.cmp(address);
+}
+
+fn isc(self: *Cpu, address: u16) !void {
+    try self.inc(address);
+    try self.sbc(address);
+}
+
+fn lax(self: *Cpu, address: u16) !void {
+    const value = try self.read(address);
+    self.a = value;
+    self.x = value;
+
+    self.handleZeroFlagStatus(value);
+    self.handleNegativeFlagStatus(value);
+}
+
+fn rla(self: *Cpu, address: u16) !void {
+    try self.rol(address);
+    try self.aand(address);
+}
+
+fn rra(self: *Cpu, address: u16) !void {
+    try self.ror(address);
+    try self.adc(address);
+}
+
+fn sax(self: *Cpu, address: u16) !void {
+    const a = self.a;
+    const x = self.x;
+    const result = a & x;
+
+    try self.write(address, result);
+}
+
+fn slo(self: *Cpu, address: u16) !void {
+    try self.asl(address);
+    try self.ora(address);
+}
+
+fn sre(self: *Cpu, address: u16) !void {
+    try self.lsr(address);
+    try self.eor(address);
 }
 
 test "SEC" {
