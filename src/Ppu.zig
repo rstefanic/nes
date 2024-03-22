@@ -50,7 +50,7 @@ oamdma: u8 = 0,
 v: u8 = 0,
 t: u8 = 0,
 x: u8 = 0,
-w: bool = true, // write latch
+w: bool = false, // write latch -- is set if we're in the middle of an ppuaddr write
 ppudata_buffer: u8 = 0,
 
 scanlines: i16 = -1,
@@ -117,10 +117,10 @@ pub inline fn writePpuscroll(self: *Ppu, value: u8) void {
 }
 
 pub inline fn writePpuaddr(self: *Ppu, value: u8) void {
-    if (self.w) { // first write
-        self.ppuaddr = @as(u16, value) << 8;
-    } else { // second write
+    if (self.w) { // set the lo byte if we're in the middle of a write
         self.ppuaddr += value;
+    } else { // set the hi byte
+        self.ppuaddr = @as(u16, value) << 8;
     }
 
     self.w = !self.w;
