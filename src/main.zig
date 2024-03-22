@@ -150,32 +150,9 @@ pub fn main() !void {
         defer raylib.EndDrawing();
         raylib.ClearBackground(raylib.BLACK);
 
-        // Events
-        if (raylib.IsKeyPressed(raylib.KEY_S) or raylib.IsKeyPressed(raylib.KEY_SPACE)) {
+        while (true) {
             try console.step();
-
-            if (try neslog.next()) |log| {
-                const same = log.compare(&cpu);
-                if (!same) {
-                    std.debug.print("NESLOG: Incorrect CPU state on line {d}\n", .{neslog.current_line_num});
-                    std.debug.print("\tLOG: A:{X} X:{X} Y:{X} P:{X} SP:{X} CYC:{d}\n", .{
-                        log.a,
-                        log.x,
-                        log.y,
-                        log.p,
-                        log.sp,
-                        log.cycles,
-                    });
-                    std.debug.print("\tCPU: A:{X} X:{X} Y:{X} P:{X} SP:{X} CYC:{d}\n", .{
-                        cpu.a,
-                        cpu.x,
-                        cpu.y,
-                        @as(u8, @bitCast(cpu.status)),
-                        cpu.sp,
-                        cpu.cycles,
-                    });
-                }
-            }
+            if (console.ppu.?.scanlines == -1) break;
         }
 
         if (raylib.IsFileDropped()) {
