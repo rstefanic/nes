@@ -60,7 +60,7 @@ palette: Palette = Palette.default(),
 buffer: [256 * 240]u8 = [_]u8{0x2C} ** (256 * 240),
 
 palette_ram: [32]u8 = [_]u8{0x00} ** 32,
-nametables: [2 * 1024]u8 = [_]u8{0} ** (2 * 1024),
+nametables: [0x800]u8 = std.mem.zeroes([0x800]u8),
 
 // Pattern Tables define the raw image data
 left_pattern_table: [256]Tile = undefined,
@@ -162,7 +162,7 @@ fn read(self: *Ppu, address: u16) !u8 {
 
             // horizontal arrangement, vertically mirrored
             if (is_horizontal_arrangement) {
-                if ((address >= 0x2000 and address <= 0x23FF) or (address >= 0x2800 and address <= 0x2BFF)) {
+                if (address >= 0x2000 and address <= 0x27FF) {
                     return self.nametables[address & 0x07FF];
                 }
 
@@ -171,10 +171,10 @@ fn read(self: *Ppu, address: u16) !u8 {
 
             // vertical arrangement, horizontally mirrored
             if (address >= 0x2000 and address <= 0x27FF) {
-                return self.nametables[address & 0x07FF];
+                return self.nametables[address & 0x03FF];
             }
 
-            return self.nametables[address & 0x0FFF];
+            return self.nametables[address & 0x07FF];
         } else {
             return PpuMemoryAccessError.MissingCartridge;
         }
@@ -195,13 +195,13 @@ fn write(self: *Ppu, address: u16, value: u8) !void {
         } else {
             return PpuMemoryAccessError.MissingCartridge;
         }
-    } else if (address >= 0x2000 and address <= 0x3000) {
+    } else if (address >= 0x2000 and address <= 0x2FFF) {
         if (self.console.cartridge) |cartridge| {
             const is_horizontal_arrangement = cartridge.header.flag6.mirroring;
 
             // horizontal arrangement, vertically mirrored
             if (is_horizontal_arrangement) {
-                if ((address >= 0x2000 and address <= 0x23FF) or (address >= 0x2800 and address <= 0x2BFF)) {
+                if (address >= 0x2000 and address <= 0x27FF) {
                     self.nametables[address & 0x07FF] = value;
                     return;
                 }
@@ -212,11 +212,12 @@ fn write(self: *Ppu, address: u16, value: u8) !void {
 
             // vertical arrangement, horizontally mirrored
             if (address >= 0x2000 and address <= 0x27FF) {
-                self.nametables[address & 0x07FF] = value;
+                self.nametables[address & 0x03FF] = value;
                 return;
             }
 
-            self.nametables[address & 0x0FFF] = value;
+            self.nametables[address & 0x07FF] = value;
+            return;
         } else {
             return PpuMemoryAccessError.MissingCartridge;
         }
