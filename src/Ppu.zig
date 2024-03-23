@@ -148,6 +148,17 @@ pub fn step(self: *Ppu) !void {
     }
 }
 
+pub fn getPaletteById(self: *Ppu, palette_id: u8) ![4]u8 {
+    const offset: u16 = palette_id * 4;
+
+    return .{
+        try self.read(0x3F00 + offset),
+        try self.read(0x3F01 + offset),
+        try self.read(0x3F02 + offset),
+        try self.read(0x3F03 + offset),
+    };
+}
+
 fn read(self: *Ppu, address: u16) !u8 {
     // Address space for accessing the left/right pattern table
     if (address >= 0x0000 and address <= 0x1FFF) {
