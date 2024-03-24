@@ -54,13 +54,16 @@ pub fn main() !void {
     defer raylib.CloseWindow();
 
     // Output Display Texture Setup
-    const output_display = raylib.Rectangle{ .x = 0, .y = 0, .width = 256 * 2, .height = 240 * 2 };
-    const output_img = raylib.GenImageColor(256, 240, raylib.BLACK);
+    const display_w = 256;
+    const display_h = 240;
+    const output_display = raylib.Rectangle{ .x = 0, .y = 0, .width = display_w, .height = display_h };
+    const upscaled_output_display = raylib.Rectangle{ .x = 0, .y = 0, .width = display_w * 2, .height = display_h * 2 };
+    const output_img = raylib.GenImageColor(display_w, display_h, raylib.BLACK);
     defer raylib.UnloadImage(output_img);
     var output_texture = raylib.LoadTextureFromImage(output_img);
     defer raylib.UnloadTexture(output_texture);
     raylib.SetTextureFilter(output_texture, raylib.TEXTURE_FILTER_BILINEAR);
-    var output_buffer: [256 * 240]raylib.Color = [_]raylib.Color{raylib.BLACK} ** (256 * 240);
+    var output_buffer: [display_w * display_h]raylib.Color = [_]raylib.Color{raylib.BLACK} ** (display_w * display_h);
 
     // Left Pattern Table Texture Setup
     const left_pattern_table_display = raylib.Rectangle{ .x = 0, .y = 0, .width = 128, .height = 128 };
@@ -201,7 +204,7 @@ pub fn main() !void {
             raylib.UpdateTexture(output_texture, &output_buffer);
         }
 
-        raylib.DrawTextureRec(output_texture, output_display, raylib.Vector2{ .x = 5, .y = 5 }, raylib.WHITE);
+        raylib.DrawTexturePro(output_texture, output_display, upscaled_output_display, raylib.Vector2{ .x = -5, .y = -5 }, 0.0, raylib.WHITE);
         raylib.DrawTextureRec(left_pattern_table_texture, left_pattern_table_display, raylib.Vector2{ .x = 800, .y = 5 }, raylib.WHITE);
         raylib.DrawTextureRec(right_pattern_table_tex, right_pattern_table_display, raylib.Vector2{ .x = 800, .y = 150 }, raylib.WHITE);
 
