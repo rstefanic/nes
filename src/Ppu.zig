@@ -148,6 +148,29 @@ pub fn step(self: *Ppu) !void {
 
         if (self.scanlines >= scanlines_per_frame) {
             self.scanlines = -1;
+
+            { // Copy to display buffer
+                const palette = try self.getPaletteById(0);
+                var y: usize = 0;
+                while (y < 30) : (y += 1) {
+                    var x: usize = 0;
+                    while (x < 32) : (x += 1) {
+                        const pattern_tbl_idx = self.nametables[x + (y * 32)];
+                        const tile = self.left_pattern_table[pattern_tbl_idx];
+                        const buffer_offset = (x * 8) + (y * tile.len * 32); // Where we'll start drawing the tile in the buffer
+
+                        // Copy the tile to the buffer
+                        var tile_y: usize = 0;
+                        while (tile_y < 8) : (tile_y += 1) {
+                            var tile_x: usize = 0;
+                            while (tile_x < 8) : (tile_x += 1) {
+                                const color = tile[tile_x + (tile_y * 8)];
+                                self.buffer[buffer_offset + tile_x + (tile_y * 8 * 32)] = palette[color];
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
