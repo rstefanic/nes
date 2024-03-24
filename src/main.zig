@@ -50,7 +50,6 @@ pub fn main() !void {
     // which we know is valid. So this log entry is ignored.
     _ = try neslog.next();
 
-    raylib.SetConfigFlags(raylib.FLAG_VSYNC_HINT);
     raylib.InitWindow(WIDTH, HEIGHT, "NES");
     defer raylib.CloseWindow();
 
@@ -279,6 +278,8 @@ pub fn main() !void {
         options.font_size = 22;
         options.pos_x = window_padding;
         try drawText(allocator, "Press \"s\" or \"<space>\" to step through the next instruction.", .{}, options);
+
+        raylib.DrawFPS(22, 600);
     }
 }
 
