@@ -10,7 +10,7 @@ const raylib = @cImport({
     @cInclude("raylib.h");
 });
 
-const WIDTH = 1024;
+const WIDTH = 1280;
 const HEIGHT = 768;
 
 pub fn main() !void {
@@ -57,7 +57,7 @@ pub fn main() !void {
     const display_w = 256;
     const display_h = 240;
     const output_display = raylib.Rectangle{ .x = 0, .y = 0, .width = display_w, .height = display_h };
-    const upscaled_output_display = raylib.Rectangle{ .x = 0, .y = 0, .width = display_w * 2, .height = display_h * 2 };
+    const upscaled_output_display = raylib.Rectangle{ .x = 0, .y = 0, .width = display_w * 3, .height = display_h * 3 };
     const output_img = raylib.GenImageColor(display_w, display_h, raylib.BLACK);
     defer raylib.UnloadImage(output_img);
     var output_texture = raylib.LoadTextureFromImage(output_img);
@@ -205,15 +205,14 @@ pub fn main() !void {
         }
 
         raylib.DrawTexturePro(output_texture, output_display, upscaled_output_display, raylib.Vector2{ .x = -5, .y = -5 }, 0.0, raylib.WHITE);
-        raylib.DrawTextureRec(left_pattern_table_texture, left_pattern_table_display, raylib.Vector2{ .x = 800, .y = 5 }, raylib.WHITE);
-        raylib.DrawTextureRec(right_pattern_table_tex, right_pattern_table_display, raylib.Vector2{ .x = 800, .y = 150 }, raylib.WHITE);
+        raylib.DrawTextureRec(left_pattern_table_texture, left_pattern_table_display, raylib.Vector2{ .x = 850, .y = 5 }, raylib.WHITE);
+        raylib.DrawTextureRec(right_pattern_table_tex, right_pattern_table_display, raylib.Vector2{ .x = 1050, .y = 5 }, raylib.WHITE);
 
         // Screen Drawing
         const y_spacing = 42;
-        const window_padding = 10;
         var options: DrawTextOptions = .{
-            .pos_x = 530,
-            .pos_y = 20,
+            .pos_x = 800,
+            .pos_y = 150,
             .font_size = 32,
         };
 
@@ -276,13 +275,7 @@ pub fn main() !void {
             options.color = raylib.GRAY; // Reset color
         }
 
-        // Draw instructions
-        options.pos_y = 500;
-        options.font_size = 22;
-        options.pos_x = window_padding;
-        try drawText(allocator, "Press \"s\" or \"<space>\" to step through the next instruction.", .{}, options);
-
-        raylib.DrawFPS(22, 600);
+        raylib.DrawFPS(5, 735);
     }
 }
 
