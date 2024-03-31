@@ -8,6 +8,7 @@ const Tile = [64]u2;
 
 const scanlines_per_frame = 262;
 const dots_per_scanline = 341;
+const visible_dots_per_scanline = 256;
 
 console: *Console,
 
@@ -55,6 +56,14 @@ ppudata_buffer: u8 = 0,
 
 scanlines: i16 = -1,
 dots: i16 = 0,
+
+framedata: struct {
+    ptrn_tbl_idx: u16 = 0, // Index to locate a tile on the pattern table
+    bg_ptrn_lsb: u8 = 0, // Current background pattern tile's lsbits and msbits
+    bg_ptrn_msb: u8 = 0,
+    bg_ptrn_lsb_buf: u8 = 0, // Buffer used to store the next background tile's bits
+    bg_ptrn_msb_buf: u8 = 0,
+} = .{},
 
 palette: Palette = Palette.default(),
 buffer: [256 * 240]u8 = [_]u8{0x2C} ** (256 * 240),
@@ -141,35 +150,77 @@ const PpuMemoryAccessError = error{
 };
 
 pub fn step(self: *Ppu) !void {
-    self.dots += 1;
-    if (self.dots >= dots_per_scanline) {
-        self.dots = 0;
-        self.scanlines += 1;
+    { // Handle current dot/scanline
+        if (self.scanlines > -1 and self.scanlines < 240) {
+            if (self.dots < visible_dots_per_scanline) {
+                switch (@mod(self.dots - 1, 8)) {
+                    0 => { // Fetch the Nametable entry
+                        // Move the BG Pattern table buffer data into the current bg pattern table
+                        self.framedata.bg_ptrn_lsb = self.framedata.bg_ptrn_lsb_buf;
+                        self.framedata.bg_ptrn_msb = self.framedata.bg_ptrn_msb_buf;
 
-        if (self.scanlines >= scanlines_per_frame) {
-            self.scanlines = -1;
+                        // The screen is 32 x 30 tiles. Determine which tile we need
+                        // based on the current dot and scanline.
+                        const x = @divTrunc(self.dots, 8);
+                        const y = @divTrunc(self.scanlines, 8);
+                        const idx: usize = @intCast(x + (y * 32));
 
-            { // Copy to display buffer
-                const palette = try self.getPaletteById(0);
-                var y: usize = 0;
-                while (y < 30) : (y += 1) {
-                    var x: usize = 0;
-                    while (x < 32) : (x += 1) {
-                        const pattern_tbl_idx = self.nametables[x + (y * 32)];
-                        const tile = self.left_pattern_table[pattern_tbl_idx];
-                        const buffer_offset = (x * 8) + (y * tile.len * 32); // Where we'll start drawing the tile in the buffer
-
-                        // Copy the tile to the buffer
-                        var tile_y: usize = 0;
-                        while (tile_y < 8) : (tile_y += 1) {
-                            var tile_x: usize = 0;
-                            while (tile_x < 8) : (tile_x += 1) {
-                                const color = tile[tile_x + (tile_y * 8)];
-                                self.buffer[buffer_offset + tile_x + (tile_y * 8 * 32)] = palette[color];
-                            }
-                        }
-                    }
+                        self.framedata.ptrn_tbl_idx = self.nametables[idx];
+                    },
+                    2 => { // Fetch the Attribute entry
+                    },
+                    4 => {
+                        const tile_addr = self.framedata.ptrn_tbl_idx << 4; // Multiply the index by 16 since each pattern table entry is 16 bytes
+                        const tile_row_offset: u8 = @intCast(@mod(self.scanlines, 8));
+                        self.framedata.bg_ptrn_lsb_buf = try self.read(tile_addr + tile_row_offset);
+                    },
+                    6 => {
+                        const tile_addr = self.framedata.ptrn_tbl_idx << 4;
+                        const hi_byte_offset = 8;
+                        const tile_row_offset: u8 = @intCast(@mod(self.scanlines, 8));
+                        self.framedata.bg_ptrn_msb_buf = try self.read(tile_addr + tile_row_offset + hi_byte_offset);
+                    },
+                    else => {}, // Cycles 1, 3, 5, and 7
                 }
+
+                { // Draw the current pixel
+                    const palette = try self.getPaletteById(0); // FIXME: Grab me from the AT
+                    const pixel_offset: u3 = @intCast(@mod(self.dots, 8));
+
+                    const lo: u2 = @truncate(self.framedata.bg_ptrn_lsb >> (7 - pixel_offset) & 1);
+                    const hi: u2 = @truncate(self.framedata.bg_ptrn_msb >> (7 - pixel_offset) & 1);
+                    const color: u2 = lo + hi;
+
+                    const x: usize = @intCast(self.dots);
+                    const y: usize = @intCast(self.scanlines);
+                    self.buffer[x + (y * visible_dots_per_scanline)] = palette[color];
+                }
+            }
+        }
+
+        if (self.scanlines == 241) {
+            if (self.dots == 1) {
+                self.ppustatus.vertical_blank = true;
+            }
+        }
+
+        if (self.scanlines == 261) {
+            if (self.dots == 1) {
+                self.ppustatus.vertical_blank = false;
+                self.ppustatus.sprite_zero_hit = false;
+                self.ppustatus.sprite_overflow = false;
+            }
+        }
+    }
+
+    { // Increment the dots and scanlines
+        self.dots += 1;
+        if (self.dots >= dots_per_scanline) {
+            self.dots = 0;
+            self.scanlines += 1;
+
+            if (self.scanlines >= scanlines_per_frame) {
+                self.scanlines = -1;
             }
         }
     }
