@@ -82,13 +82,12 @@ pub fn reset(self: *Ppu) !void {
 }
 
 pub inline fn readPpustatus(self: *Ppu) u8 {
+    const ppustatus: u8 = @bitCast(self.ppustatus);
+
     self.w = false; // clears the address latch bit
     self.ppustatus.vertical_blank = false; // clears the vertical blank flag
 
-    // FIXME: Added for debugging purposes and needs to be removed. By setting
-    // vertical blank to true, the CPU will know it's okay to write the the PPU.
-    self.ppustatus.vertical_blank = true;
-    return @bitCast(self.ppustatus);
+    return ppustatus;
 }
 
 pub inline fn readOamdata(self: *Ppu) u8 {
