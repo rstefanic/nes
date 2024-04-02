@@ -5,6 +5,7 @@ const Console = @import("Console.zig");
 const Cpu = @import("Cpu.zig");
 const Palette = @import("Palette.zig");
 const Ppu = @import("Ppu.zig");
+const Controller = @import("Controller.zig");
 const NesLog = @import("NesLog.zig");
 const raylib = @cImport({
     @cInclude("raylib.h");
@@ -22,6 +23,7 @@ pub fn main() !void {
     var cpu = Cpu{ .console = &console };
     var cartridge: ?Cartridge = null;
     var ppu = Ppu{ .console = &console };
+    var controller = Controller{ .console = &console };
 
     const args = try std.process.argsAlloc(allocator);
     if (args.len > 1) { // Treat any arguments as a filepath to a ROM
@@ -40,6 +42,7 @@ pub fn main() !void {
 
     console.connectCpu(&cpu);
     console.connectPpu(&ppu);
+    console.connectController(&controller);
     try ppu.setupPatternTables();
     try cpu.reset();
     try ppu.reset();
@@ -85,6 +88,18 @@ pub fn main() !void {
         raylib.BeginDrawing();
         defer raylib.EndDrawing();
         raylib.ClearBackground(raylib.BLACK);
+
+        {
+            // User Input
+            controller.buttons.a = raylib.IsKeyPressed(raylib.KEY_Z);
+            controller.buttons.b = raylib.IsKeyPressed(raylib.KEY_X);
+            controller.buttons.select = raylib.IsKeyPressed(raylib.KEY_F);
+            controller.buttons.start = raylib.IsKeyPressed(raylib.KEY_G);
+            controller.buttons.up = raylib.IsKeyPressed(raylib.KEY_UP);
+            controller.buttons.down = raylib.IsKeyPressed(raylib.KEY_DOWN);
+            controller.buttons.left = raylib.IsKeyPressed(raylib.KEY_LEFT);
+            controller.buttons.right = raylib.IsKeyPressed(raylib.KEY_RIGHT);
+        }
 
         while (true) {
             try console.step();
