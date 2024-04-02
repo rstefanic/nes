@@ -113,6 +113,10 @@ fn write(self: *Cpu, address: u16, value: u8) !void {
             }
         }
         return;
+    } else if (address >= 0x4000 and address <= 0x401F) {
+        return;
+    } else if (address >= 0x4020 and address <= 0x7FFF) {
+        return;
     } else if (address >= 0x8000 and address <= 0xFFFF) {
         if (self.console.cartridge) |cartridge| {
             cartridge.write(address, value);
