@@ -200,6 +200,9 @@ pub fn step(self: *Ppu) !void {
         if (self.scanlines == 241) {
             if (self.dots == 1) {
                 self.ppustatus.vertical_blank = true;
+                if (self.ppuctrl.v) {
+                    try self.console.cpu.?.nmi();
+                }
             }
         }
 
