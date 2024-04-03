@@ -28,7 +28,7 @@ pub fn read(self: *Controller) u8 {
 }
 
 pub fn write(self: *Controller, value: u8) void {
-    if (value == 1) { // Signal to the controller to poll the input
+    if (value > 0) { // Signal to the controller to poll the input
         self.state = @bitCast(self.buttons);
     }
 }
