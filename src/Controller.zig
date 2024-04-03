@@ -5,14 +5,14 @@ const Console = @import("Console.zig");
 console: *Console,
 
 buttons: packed struct(u8) {
-    a: bool = false,
-    b: bool = false,
-    select: bool = false,
-    start: bool = false,
-    up: bool = false,
-    down: bool = false,
-    left: bool = false,
     right: bool = false,
+    left: bool = false,
+    down: bool = false,
+    up: bool = false,
+    start: bool = false,
+    select: bool = false,
+    b: bool = false,
+    a: bool = false,
 } = .{},
 
 state: u8 = 0, // Shift register containing the state of the controller when polled
