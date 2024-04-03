@@ -876,15 +876,15 @@ fn rti(self: *Cpu) !void {
 }
 
 fn brk(self: *Cpu) !void {
+    // Push the current pc in little endian format
+    try self.stackPush(@truncate(self.pc >> 8));
+    try self.stackPush(@truncate(self.pc & 0x00FF));
+
     // NOTE: The break flag is always set whenever the transfer was caused
     // by software (e.g. PHP or BRK). See here for more information:
     // https://www.masswerk.at/6502/6502_instruction_set.html#break-flag
     const status = @as(u8, @bitCast(self.status)) | 0b00010000;
     try self.stackPush(status);
-
-    // Push the current pc in little endian format
-    try self.stackPush(@truncate(self.pc >> 8));
-    try self.stackPush(@truncate(self.pc & 0x00FF));
 
     // Read from the IRQ/BRK vector
     const lo_byte = try self.read(0xFFFE);
