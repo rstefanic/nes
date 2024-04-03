@@ -91,14 +91,14 @@ pub fn main() !void {
 
         {
             // User Input
-            controller.buttons.a = raylib.IsKeyPressed(raylib.KEY_Z);
-            controller.buttons.b = raylib.IsKeyPressed(raylib.KEY_X);
-            controller.buttons.select = raylib.IsKeyPressed(raylib.KEY_F);
-            controller.buttons.start = raylib.IsKeyPressed(raylib.KEY_G);
-            controller.buttons.up = raylib.IsKeyPressed(raylib.KEY_UP);
-            controller.buttons.down = raylib.IsKeyPressed(raylib.KEY_DOWN);
-            controller.buttons.left = raylib.IsKeyPressed(raylib.KEY_LEFT);
-            controller.buttons.right = raylib.IsKeyPressed(raylib.KEY_RIGHT);
+            controller.buttons.a = raylib.IsKeyDown(raylib.KEY_Z);
+            controller.buttons.b = raylib.IsKeyDown(raylib.KEY_X);
+            controller.buttons.select = raylib.IsKeyDown(raylib.KEY_F);
+            controller.buttons.start = raylib.IsKeyDown(raylib.KEY_G);
+            controller.buttons.up = raylib.IsKeyDown(raylib.KEY_UP);
+            controller.buttons.down = raylib.IsKeyDown(raylib.KEY_DOWN);
+            controller.buttons.left = raylib.IsKeyDown(raylib.KEY_LEFT);
+            controller.buttons.right = raylib.IsKeyDown(raylib.KEY_RIGHT);
         }
 
         while (true) {
