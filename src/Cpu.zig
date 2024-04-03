@@ -892,6 +892,36 @@ fn brk(self: *Cpu) !void {
     self.pc = makeWord(hi_byte, lo_byte);
 }
 
+pub fn irq(self: *Cpu) !void {
+    if (!self.status.interrupt_disable) {
+        return;
+    }
+
+    try self.stackPush(@truncate(self.pc >> 8));
+    try self.stackPush(@truncate(self.pc & 0x00FF));
+
+    const status = @as(u8, @bitCast(self.status)) | 0b00010000;
+    try self.stackPush(status);
+
+    const lo = try self.read(0xFFFE);
+    const hi = try self.read(0xFFFF);
+    self.pc = makeWord(hi, lo);
+    self.cycles += 8;
+}
+
+pub fn nmi(self: *Cpu) !void {
+    try self.stackPush(@truncate(self.pc >> 8));
+    try self.stackPush(@truncate(self.pc & 0x00FF));
+
+    const status = @as(u8, @bitCast(self.status)) | 0b00010000;
+    try self.stackPush(status);
+
+    const lo = try self.read(0xFFFA);
+    const hi = try self.read(0xFFFB);
+    self.pc = makeWord(hi, lo);
+    self.cycles += 8;
+}
+
 fn nop(self: *Cpu) void {
     _ = self;
 }
