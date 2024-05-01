@@ -58,7 +58,7 @@ scanlines: i16 = -1,
 dots: i16 = 0,
 
 framedata: struct {
-    ptrn_tbl_idx: u16 = 0, // Index to locate a tile on the pattern table
+    nametable_entry: u8 = 0, // Index to locate a tile on the pattern table
     attribute_entry: u8 = 0, // Color data for the pattern taken from the Attribute table
     bg_ptrn_lsb: u8 = 0, // Current background pattern tile's lsbits and msbits
     bg_ptrn_msb: u8 = 0,
@@ -159,19 +159,20 @@ pub fn step(self: *Ppu) !void {
         if (self.scanlines > -1 and self.scanlines < 240) {
             if (self.dots < visible_dots_per_scanline) {
                 switch (@mod(self.dots - 1, 8)) {
-                    0 => { // Fetch the Nametable entry
-                        // Move the BG Pattern table buffer data into the current bg pattern table
+                    0 => {
+                        // Shift the buffered framedata before the next tile is fetched
                         self.framedata.bg_ptrn_lsb = self.framedata.bg_ptrn_lsb_buf;
                         self.framedata.bg_ptrn_msb = self.framedata.bg_ptrn_msb_buf;
                         self.framedata.attribute_entry = self.framedata.attribute_byte_buf;
 
-                        // The screen is 32 x 30 tiles. Determine which tile we need
-                        // based on the current dot and scanline.
+                        // Use the dot + scanline to find the nametable tile entry
                         const x = @divTrunc(self.dots, 8);
                         const y = @divTrunc(self.scanlines, 8);
-                        const idx: usize = @intCast(x + (y * 32));
+                        const idx: u16 = @intCast(x + (y * 32)); // Multiply by 32 since the screen is 32x30 tiles
+                        const nametable_offset = 0x2000;
+                        const tile = try self.read(nametable_offset + idx);
 
-                        self.framedata.ptrn_tbl_idx = self.nametables[idx];
+                        self.framedata.nametable_entry = tile;
                     },
                     2 => {
                         // Use the dot + scanline to find the attribute table entry
@@ -184,12 +185,14 @@ pub fn step(self: *Ppu) !void {
                         self.framedata.attribute_byte_buf = attribute;
                     },
                     4 => {
-                        const tile_addr = self.framedata.ptrn_tbl_idx << 4; // Multiply the index by 16 since each pattern table entry is 16 bytes
+                        var tile_addr: u16 = self.framedata.nametable_entry;
+                        tile_addr <<= 4; // Multiply by 16 since each pattern table entry is 16 bytes
                         const tile_row_offset: u8 = @intCast(@mod(self.scanlines, 8));
                         self.framedata.bg_ptrn_lsb_buf = try self.read(tile_addr + tile_row_offset);
                     },
                     6 => {
-                        const tile_addr = self.framedata.ptrn_tbl_idx << 4;
+                        var tile_addr: u16 = self.framedata.nametable_entry;
+                        tile_addr <<= 4; // Multiply by 16 since each pattern table entry is 16 bytes
                         const hi_byte_offset = 8;
                         const tile_row_offset: u8 = @intCast(@mod(self.scanlines, 8));
                         self.framedata.bg_ptrn_msb_buf = try self.read(tile_addr + tile_row_offset + hi_byte_offset);
