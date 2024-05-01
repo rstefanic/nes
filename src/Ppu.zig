@@ -59,13 +59,19 @@ dots: i16 = 0,
 
 framedata: struct {
     ptrn_tbl_idx: u16 = 0, // Index to locate a tile on the pattern table
+    attribute_entry: u8 = 0, // Color data for the pattern taken from the Attribute table
     bg_ptrn_lsb: u8 = 0, // Current background pattern tile's lsbits and msbits
     bg_ptrn_msb: u8 = 0,
+    attribute_byte_buf: u8 = 0,
     bg_ptrn_lsb_buf: u8 = 0, // Buffer used to store the next background tile's bits
     bg_ptrn_msb_buf: u8 = 0,
 } = .{},
 
 palette: Palette = Palette.default(),
+
+// The display consists of 32x30 tiles, where each tile is 8x8 pixels.
+// Tiles can be further grouped into 2x2 groups called quadrants.
+// Quadrants can be further grouped into 2x2 groups called blocks.
 buffer: [256 * 240]u8 = [_]u8{0x2C} ** (256 * 240),
 
 palette_ram: [32]u8 = [_]u8{0x00} ** 32,
@@ -157,6 +163,7 @@ pub fn step(self: *Ppu) !void {
                         // Move the BG Pattern table buffer data into the current bg pattern table
                         self.framedata.bg_ptrn_lsb = self.framedata.bg_ptrn_lsb_buf;
                         self.framedata.bg_ptrn_msb = self.framedata.bg_ptrn_msb_buf;
+                        self.framedata.attribute_entry = self.framedata.attribute_byte_buf;
 
                         // The screen is 32 x 30 tiles. Determine which tile we need
                         // based on the current dot and scanline.
@@ -166,7 +173,15 @@ pub fn step(self: *Ppu) !void {
 
                         self.framedata.ptrn_tbl_idx = self.nametables[idx];
                     },
-                    2 => { // Fetch the Attribute entry
+                    2 => {
+                        // Use the dot + scanline to find the attribute table entry
+                        const x = self.dots >> 5; // Dividing by 32 gives us the current block
+                        const y = self.scanlines >> 5;
+                        const block: u16 = @intCast(x + (y * 8)); // Multiply by 8 since the screen is 8x8 blocks
+                        const attribute_table_offset = 0x23C0;
+                        const attribute = try self.read(attribute_table_offset + block);
+
+                        self.framedata.attribute_byte_buf = attribute;
                     },
                     4 => {
                         const tile_addr = self.framedata.ptrn_tbl_idx << 4; // Multiply the index by 16 since each pattern table entry is 16 bytes
@@ -182,12 +197,23 @@ pub fn step(self: *Ppu) !void {
                     else => {}, // Cycles 1, 3, 5, and 7
                 }
 
-                { // Draw the current pixel
-                    const palette = try self.getPaletteById(0); // FIXME: Grab me from the AT
-                    const pixel_offset: u3 = @intCast(@mod(self.dots, 8));
+                {
+                    // Draw the current pixel
 
-                    const lo: u2 = @truncate(self.framedata.bg_ptrn_lsb >> (7 - pixel_offset) & 1);
-                    const hi: u2 = @truncate(self.framedata.bg_ptrn_msb >> (7 - pixel_offset) & 1);
+                    const quad: u3 = quadrant: {
+                        const x = self.dots >> 4; // Dividing by 16 gives us the current quadrant
+                        const y = self.scanlines >> 4;
+                        break :quadrant @intCast(@mod(x, 2) + (@mod(y, 2) * 2));
+                    };
+
+                    // Use the quadrant to tell us what part of the attribute byte we need to read to select the color palette
+                    const color_pal_id: u3 = @truncate(self.framedata.attribute_entry >> (quad * 2));
+
+                    const palette = try self.getPaletteById(color_pal_id);
+
+                    const pixel: u3 = @intCast(@mod(self.dots, 8)); // The pixel within the tile that we're drawing
+                    const lo: u2 = @truncate(self.framedata.bg_ptrn_lsb >> (7 - pixel) & 1);
+                    const hi: u2 = @truncate(self.framedata.bg_ptrn_msb >> (7 - pixel) & 1);
                     const color: u2 = lo + hi;
 
                     const x: usize = @intCast(self.dots);
