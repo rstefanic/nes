@@ -63,7 +63,7 @@ oamdma: u8 = 0,
 ppuaddr: PpuAddress = .{}, // Referenced as 'v' in the NesDev Wiki
 temp_ppuaddr: PpuAddress = .{}, // Referenced as 't' in the NesDev Wiki
 x: u8 = 0,
-w: bool = false, // write latch -- is set if we're in the middle of an ppuaddr write
+w: bool = false, // write latch -- is set if we're in the middle of an ppuaddr/ppuscroll write
 ppudata_buffer: u8 = 0,
 
 scanlines: i16 = -1,
@@ -145,7 +145,15 @@ pub inline fn writeOamdata(self: *Ppu, value: u8) void {
 }
 
 pub inline fn writePpuscroll(self: *Ppu, value: u8) void {
-    self.ppuscroll = value;
+    if (self.w) { // Second write is to Y
+        self.temp_ppuaddr.fine_y = @truncate(value & 0x7); // 3 lsb
+        self.temp_ppuaddr.coarse_y = @truncate(value & 0xF8); // 5 msb
+    } else { // First write is to X
+        self.x = @truncate(value & 0x7); // 3 lsb
+        self.temp_ppuaddr.coarse_x = @truncate(value & 0xF8); // 5 msb
+    }
+
+    self.w = !self.w;
 }
 
 pub inline fn writePpuaddr(self: *Ppu, value: u8) void {
