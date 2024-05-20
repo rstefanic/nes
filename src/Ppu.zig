@@ -10,6 +10,19 @@ const scanlines_per_frame = 262;
 const dots_per_scanline = 341;
 const visible_dots_per_scanline = 256;
 
+/// yyy NN YYYYY XXXXX
+/// ||| || ||||| +++++-- coarse X scroll
+/// ||| || +++++-------- coarse Y scroll
+/// ||| ++-------------- nametable select
+/// +++----------------- fine Y scroll
+const PpuAddress = packed struct(u16) {
+    coarse_x: u5 = 0,
+    coarse_y: u5 = 0,
+    nametable: u2 = 0,
+    fine_y: u3 = 0,
+    _unused: u1 = 0,
+};
+
 console: *Console,
 
 ppuctrl: packed struct(u8) {
@@ -43,13 +56,12 @@ ppustatus: packed struct(u8) {
 oamaddr: u8 = 0,
 oamdata: u8 = 0,
 ppuscroll: u8 = 0,
-ppuaddr: u16 = 0,
 ppudata: u8 = 0,
 oamdma: u8 = 0,
 
 // Internal registers
-v: u8 = 0,
-t: u8 = 0,
+ppuaddr: PpuAddress = .{}, // Referenced as 'v' in the NesDev Wiki
+temp_ppuaddr: PpuAddress = .{}, // Referenced as 't' in the NesDev Wiki
 x: u8 = 0,
 w: bool = false, // write latch -- is set if we're in the middle of an ppuaddr write
 ppudata_buffer: u8 = 0,
@@ -102,15 +114,17 @@ pub inline fn readOamdata(self: *Ppu) u8 {
 
 pub inline fn readPpudata(self: *Ppu) !u8 {
     var data = self.ppudata_buffer;
-    self.ppudata_buffer = try self.read(self.ppuaddr);
+    var ppuaddr: u16 = @bitCast(self.ppuaddr);
+    self.ppudata_buffer = try self.read(ppuaddr);
 
     // Palette data is returned immediately instead of being
     // primed on the internal ppudata buffer.
-    if (self.ppuaddr >= 0x3F00 and self.ppuaddr <= 0x3FFF) {
+    if (ppuaddr >= 0x3F00 and ppuaddr <= 0x3FFF) {
         data = self.ppudata_buffer;
     }
 
-    self.ppuaddr += if (self.ppuctrl.i) 32 else 1;
+    ppuaddr += if (self.ppuctrl.i) 32 else 1;
+    self.ppuaddr = @bitCast(ppuaddr);
     return data;
 }
 
@@ -135,18 +149,26 @@ pub inline fn writePpuscroll(self: *Ppu, value: u8) void {
 }
 
 pub inline fn writePpuaddr(self: *Ppu, value: u8) void {
+    var temp_ppuaddr: u16 = @bitCast(self.temp_ppuaddr);
+
     if (self.w) { // set the lo byte if we're in the middle of a write
-        self.ppuaddr += value;
+        temp_ppuaddr += value;
+        self.temp_ppuaddr = @bitCast(temp_ppuaddr);
+        self.ppuaddr = self.temp_ppuaddr;
     } else { // set the hi byte
-        self.ppuaddr = @as(u16, value) << 8;
+        temp_ppuaddr = @as(u16, value) << 8;
+        self.temp_ppuaddr = @bitCast(temp_ppuaddr);
     }
 
     self.w = !self.w;
 }
 
 pub inline fn writePpudata(self: *Ppu, value: u8) !void {
-    try self.write(self.ppuaddr, value);
-    self.ppuaddr += if (self.ppuctrl.i) 32 else 1;
+    var ppuaddr: u16 = @bitCast(self.ppuaddr);
+    try self.write(ppuaddr, value);
+    ppuaddr += if (self.ppuctrl.i) 32 else 1;
+
+    self.ppuaddr = @bitCast(ppuaddr);
 }
 
 const PpuMemoryAccessError = error{
