@@ -217,12 +217,14 @@ pub fn step(self: *Ppu) !void {
                     4 => {
                         var tile_addr: u16 = self.framedata.nametable_entry;
                         tile_addr <<= 4; // Multiply by 16 since each pattern table entry is 16 bytes
+                        tile_addr |= if (self.ppuctrl.b) 0x1000 else 0x0000;
                         const tile_row_offset: u8 = @intCast(@mod(self.scanlines, 8));
                         self.framedata.bg_ptrn_lsb_buf = try self.read(tile_addr + tile_row_offset);
                     },
                     6 => {
                         var tile_addr: u16 = self.framedata.nametable_entry;
                         tile_addr <<= 4; // Multiply by 16 since each pattern table entry is 16 bytes
+                        tile_addr |= if (self.ppuctrl.b) 0x1000 else 0x0000;
                         const hi_byte_offset = 8;
                         const tile_row_offset: u8 = @intCast(@mod(self.scanlines, 8));
                         self.framedata.bg_ptrn_msb_buf = try self.read(tile_addr + tile_row_offset + hi_byte_offset);
