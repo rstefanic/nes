@@ -86,6 +86,8 @@ fn read(self: *Cpu, address: u16) !u8 {
         if (self.console.controller) |controller| {
             return controller.read();
         }
+    } else if (address == 0x4017) {
+        return 0x00;
     } else if (address >= 0x8000 and address <= 0xFFFF) {
         if (self.console.cartridge) |cartridge| {
             return cartridge.read(address);
