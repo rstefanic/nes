@@ -334,6 +334,7 @@ fn read(self: *Ppu, address: u16) !u8 {
         return self.palette_ram[address & 0x001F];
     }
 
+    std.debug.print("Invalid PPU read: 0x{x}\n", .{address});
     return PpuMemoryAccessError.InvalidMemoryAddress;
 }
 
@@ -376,6 +377,7 @@ fn write(self: *Ppu, address: u16, value: u8) !void {
         return;
     }
 
+    std.debug.print("Invalid PPU write: 0x{x}\n", .{address});
     return PpuMemoryAccessError.InvalidMemoryAddress;
 }
 

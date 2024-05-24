@@ -96,6 +96,7 @@ fn read(self: *Cpu, address: u16) !u8 {
         }
     }
 
+    std.debug.print("Invalid CPU read: 0x{x}\n", .{address});
     return CpuMemoryAccessError.InvalidMemoryAddress;
 }
 
@@ -137,6 +138,7 @@ fn write(self: *Cpu, address: u16, value: u8) !void {
         }
     }
 
+    std.debug.print("Invalid CPU write: 0x{x}\n", .{address});
     return CpuMemoryAccessError.InvalidMemoryAddress;
 }
 
