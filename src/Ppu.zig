@@ -195,22 +195,19 @@ pub fn step(self: *Ppu) !void {
                         self.framedata.bg_ptrn_msb = self.framedata.bg_ptrn_msb_buf;
                         self.framedata.attribute_entry = self.framedata.attribute_byte_buf;
 
-                        // Use the dot + scanline to find the nametable tile entry
-                        const x = @divTrunc(self.dots, 8);
-                        const y = @divTrunc(self.scanlines, 8);
-                        const idx: u16 = @intCast(x + (y * 32)); // Multiply by 32 since the screen is 32x30 tiles
-                        const nametable_offset = 0x2000;
-                        const tile = try self.read(nametable_offset + idx);
+                        const nametable_offset: u16 = 0x2000;
+                        const addr: u16 = @bitCast(self.ppuaddr);
+                        const tile = try self.read(nametable_offset + (addr & 0x0FFF));
 
                         self.framedata.nametable_entry = tile;
                     },
                     2 => {
-                        // Use the dot + scanline to find the attribute table entry
-                        const x = self.dots >> 5; // Dividing by 32 gives us the current block
-                        const y = self.scanlines >> 5;
-                        const block: u16 = @intCast(x + (y * 8)); // Multiply by 8 since the screen is 8x8 blocks
-                        const attribute_table_offset = 0x23C0;
-                        const attribute = try self.read(attribute_table_offset + block);
+                        const attribute_table_offset: u16 = 0x23C0; // 0010_0011_1100_0000
+                        const nametable: u16 = @as(u16, self.ppuaddr.nametable) << 10; // 0000_nn00_0000_0000
+                        const coarse_y: u16 = (self.ppuaddr.coarse_y >> 2) << 3; // 0000_0000_00yy_y000
+                        const coarse_x: u16 = self.ppuaddr.coarse_x >> 2; // 0000_0000_0000_0xxx
+                        const addr = attribute_table_offset | nametable | coarse_y | coarse_x; // 0010_nn11_11yy_yxxx
+                        const attribute = try self.read(addr);
 
                         self.framedata.attribute_byte_buf = attribute;
                     },
