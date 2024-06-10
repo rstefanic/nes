@@ -53,6 +53,7 @@ pub fn main() !void {
     // which we know is valid. So this log entry is ignored.
     _ = try neslog.next();
 
+    raylib.SetTraceLogLevel(raylib.LOG_ERROR);
     raylib.InitWindow(WIDTH, HEIGHT, "NES");
     defer raylib.CloseWindow();
 
