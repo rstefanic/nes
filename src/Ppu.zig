@@ -247,9 +247,9 @@ pub fn step(self: *Ppu) !void {
                     const palette = try self.getPaletteById(color_pal_id);
 
                     const pixel: u3 = @intCast(@mod(self.dots, 8)); // The pixel within the tile that we're drawing
-                    const lo: u2 = @truncate(self.framedata.bg_ptrn_lsb >> (7 - pixel) & 1);
-                    const hi: u2 = @truncate(self.framedata.bg_ptrn_msb >> (7 - pixel) & 1);
-                    const color: u2 = lo + hi;
+                    const lo: u1 = @truncate(self.framedata.bg_ptrn_lsb >> (7 - pixel) & 1);
+                    const hi: u2 = @truncate((self.framedata.bg_ptrn_msb >> (7 - pixel) & 1) << 1);
+                    const color: u2 = hi + lo;
 
                     const x: usize = @intCast(self.dots);
                     const y: usize = @intCast(self.scanlines);
