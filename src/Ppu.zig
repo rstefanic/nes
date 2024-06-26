@@ -147,10 +147,10 @@ pub inline fn writeOamdata(self: *Ppu, value: u8) void {
 pub inline fn writePpuscroll(self: *Ppu, value: u8) void {
     if (self.w) { // Second write is to Y
         self.temp_ppuaddr.fine_y = @truncate(value & 0x7); // 3 lsb
-        self.temp_ppuaddr.coarse_y = @truncate(value & 0xF8); // 5 msb
+        self.temp_ppuaddr.coarse_y = @truncate(value >> 3); // 5 msb
     } else { // First write is to X
         self.x = @truncate(value & 0x7); // 3 lsb
-        self.temp_ppuaddr.coarse_x = @truncate(value & 0xF8); // 5 msb
+        self.temp_ppuaddr.coarse_x = @truncate(value >> 3); // 5 msb
     }
 
     self.w = !self.w;
