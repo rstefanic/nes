@@ -6,7 +6,7 @@ const Console = @import("Console.zig");
 const Palette = @import("Palette.zig");
 const Tile = [64]u2;
 
-const scanlines_per_frame = 262;
+const scanlines_per_frame = 260;
 const dots_per_scanline = 341;
 const visible_dots_per_scanline = 256;
 
