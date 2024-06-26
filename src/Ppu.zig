@@ -305,7 +305,7 @@ fn read(self: *Ppu, address: u16) !u8 {
         } else {
             return PpuMemoryAccessError.MissingCartridge;
         }
-    } else if (address >= 0x2000 and address <= 0x3000) {
+    } else if (address >= 0x2000 and address <= 0x3EFF) {
         if (self.console.cartridge) |cartridge| {
             const is_horizontal_arrangement = cartridge.header.flag6.mirroring;
 
@@ -345,7 +345,7 @@ fn write(self: *Ppu, address: u16, value: u8) !void {
         } else {
             return PpuMemoryAccessError.MissingCartridge;
         }
-    } else if (address >= 0x2000 and address <= 0x2FFF) {
+    } else if (address >= 0x2000 and address <= 0x3EFF) {
         if (self.console.cartridge) |cartridge| {
             const is_horizontal_arrangement = cartridge.header.flag6.mirroring;
 
