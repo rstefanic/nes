@@ -74,9 +74,19 @@ framedata: struct {
     attribute_entry: u8 = 0, // Color data for the pattern taken from the Attribute table
     bg_ptrn_lsb: u8 = 0, // Current background pattern tile's lsbits and msbits
     bg_ptrn_msb: u8 = 0,
-    attribute_byte_buf: u8 = 0,
-    bg_ptrn_lsb_buf: u8 = 0, // Buffer used to store the next background tile's bits
-    bg_ptrn_msb_buf: u8 = 0,
+
+    buffer: struct {
+        attribute_byte: u8 = 0,
+        bg_ptrn_lsb: u8 = 0,
+        bg_ptrn_msb: u8 = 0,
+    } = .{},
+
+    shift_registers: struct {
+        bg_ptrn_lsb: u16 = 0,
+        bg_ptrn_msb: u16 = 0,
+        attrib_lsb: u16 = 0,
+        attrib_msb: u16 = 0,
+    } = .{},
 } = .{},
 
 palette: Palette = Palette.default(),
@@ -185,103 +195,186 @@ const PpuMemoryAccessError = error{
 };
 
 pub fn step(self: *Ppu) !void {
-    { // Handle current dot/scanline
-        if (self.scanlines > -1 and self.scanlines < 240) {
-            if (self.dots < visible_dots_per_scanline) {
-                switch (@mod(self.dots - 1, 8)) {
-                    0 => {
-                        // Shift the buffered framedata before the next tile is fetched
-                        self.framedata.bg_ptrn_lsb = self.framedata.bg_ptrn_lsb_buf;
-                        self.framedata.bg_ptrn_msb = self.framedata.bg_ptrn_msb_buf;
-                        self.framedata.attribute_entry = self.framedata.attribute_byte_buf;
-
-                        const nametable_offset: u16 = 0x2000;
-                        const addr: u16 = @bitCast(self.ppuaddr);
-                        const tile = try self.read(nametable_offset + (addr & 0x0FFF));
-
-                        self.framedata.nametable_entry = tile;
-                    },
-                    2 => {
-                        const attribute_table_offset: u16 = 0x23C0; // 0010_0011_1100_0000
-                        const nametable: u16 = @as(u16, self.ppuaddr.nametable) << 10; // 0000_nn00_0000_0000
-                        const coarse_y: u16 = (self.ppuaddr.coarse_y >> 2) << 3; // 0000_0000_00yy_y000
-                        const coarse_x: u16 = self.ppuaddr.coarse_x >> 2; // 0000_0000_0000_0xxx
-                        const addr = attribute_table_offset | nametable | coarse_y | coarse_x; // 0010_nn11_11yy_yxxx
-                        const attribute = try self.read(addr);
-
-                        self.framedata.attribute_byte_buf = attribute;
-                    },
-                    4 => {
-                        var tile_addr: u16 = self.framedata.nametable_entry;
-                        tile_addr <<= 4; // Multiply by 16 since each pattern table entry is 16 bytes
-                        tile_addr |= if (self.ppuctrl.b) 0x1000 else 0x0000;
-                        const tile_row_offset: u8 = @intCast(@mod(self.scanlines, 8));
-                        self.framedata.bg_ptrn_lsb_buf = try self.read(tile_addr + tile_row_offset);
-                    },
-                    6 => {
-                        var tile_addr: u16 = self.framedata.nametable_entry;
-                        tile_addr <<= 4; // Multiply by 16 since each pattern table entry is 16 bytes
-                        tile_addr |= if (self.ppuctrl.b) 0x1000 else 0x0000;
-                        const hi_byte_offset = 8;
-                        const tile_row_offset: u8 = @intCast(@mod(self.scanlines, 8));
-                        self.framedata.bg_ptrn_msb_buf = try self.read(tile_addr + tile_row_offset + hi_byte_offset);
-                    },
-                    else => {}, // Cycles 1, 3, 5, and 7
-                }
-
-                {
-                    // Draw the current pixel
-
-                    const quad: u3 = quadrant: {
-                        const x = self.dots >> 4; // Dividing by 16 gives us the current quadrant
-                        const y = self.scanlines >> 4;
-                        break :quadrant @intCast(@mod(x, 2) + (@mod(y, 2) * 2));
-                    };
-
-                    // Use the quadrant to tell us what part of the attribute byte we need to read to select the color palette
-                    const color_pal_id: u3 = @truncate(self.framedata.attribute_entry >> (quad * 2));
-
-                    const palette = try self.getPaletteById(color_pal_id);
-
-                    const pixel: u3 = @intCast(@mod(self.dots, 8)); // The pixel within the tile that we're drawing
-                    const lo: u2 = @truncate(self.framedata.bg_ptrn_lsb >> (7 - pixel) & 1);
-                    const hi: u2 = @truncate(self.framedata.bg_ptrn_msb >> (7 - pixel) & 1);
-                    const color: u2 = lo + hi;
-
-                    const x: usize = @intCast(self.dots);
-                    const y: usize = @intCast(self.scanlines);
-                    self.buffer[x + (y * visible_dots_per_scanline)] = palette[color];
-                }
-            }
+    // Pre-render line
+    if (self.scanlines == -1) {
+        if (self.dots == 1) {
+            self.ppustatus.vertical_blank = false;
+            self.ppustatus.sprite_zero_hit = false;
+            self.ppustatus.sprite_overflow = false;
         }
 
-        if (self.scanlines == 241) {
-            if (self.dots == 1) {
-                self.ppustatus.vertical_blank = true;
-                if (self.ppuctrl.v) {
-                    try self.console.cpu.?.nmi();
-                }
-            }
-        }
-
-        if (self.scanlines == 261) {
-            if (self.dots == 1) {
-                self.ppustatus.vertical_blank = false;
-                self.ppustatus.sprite_zero_hit = false;
-                self.ppustatus.sprite_overflow = false;
+        // Reset the vertical scroll registers for the next frame
+        if (self.dots >= 280 and self.dots <= 304) {
+            if (self.ppumask.show_background or self.ppumask.show_sptires) {
+                const mask: u2 = 0b10;
+                self.ppuaddr.nametable = (self.ppuaddr.nametable & ~mask) | (self.temp_ppuaddr.nametable & mask);
+                self.ppuaddr.coarse_y = self.temp_ppuaddr.coarse_y;
+                self.ppuaddr.fine_y = self.temp_ppuaddr.fine_y;
             }
         }
     }
 
-    { // Increment the dots and scanlines
-        self.dots += 1;
-        if (self.dots >= dots_per_scanline) {
-            self.dots = 0;
-            self.scanlines += 1;
-
-            if (self.scanlines >= scanlines_per_frame) {
-                self.scanlines = -1;
+    // Visible Scanlines
+    else if (self.scanlines < 240) {
+        if ((self.dots > 0 and self.dots <= 257) or (self.dots >= 321 and self.dots <= 336)) {
+            // Update Shifters
+            if (self.ppumask.show_background) {
+                self.framedata.shift_registers.bg_ptrn_lsb <<= 1;
+                self.framedata.shift_registers.bg_ptrn_msb <<= 1;
+                self.framedata.shift_registers.attrib_lsb <<= 1;
+                self.framedata.shift_registers.attrib_msb <<= 1;
             }
+
+            switch (@mod(self.dots - 1, 8)) {
+                0 => {
+                    // Shift the buffered framedata before determining the next tile
+                    self.framedata.shift_registers.bg_ptrn_lsb = (self.framedata.shift_registers.bg_ptrn_lsb & 0xFF00) | self.framedata.buffer.bg_ptrn_lsb;
+                    self.framedata.shift_registers.bg_ptrn_msb = (self.framedata.shift_registers.bg_ptrn_msb & 0xFF00) | self.framedata.buffer.bg_ptrn_msb;
+
+                    if ((self.framedata.buffer.attribute_byte & 0x01) > 0) {
+                        self.framedata.shift_registers.attrib_lsb = (self.framedata.shift_registers.attrib_lsb & 0xFF00) | 0xFF;
+                    } else {
+                        self.framedata.shift_registers.attrib_lsb = (self.framedata.shift_registers.attrib_lsb & 0xFF00) | 0x00;
+                    }
+
+                    if ((self.framedata.buffer.attribute_byte & 0x02) > 0) {
+                        self.framedata.shift_registers.attrib_msb = (self.framedata.shift_registers.attrib_msb & 0xFF00) | 0xFF;
+                    } else {
+                        self.framedata.shift_registers.attrib_msb = (self.framedata.shift_registers.attrib_msb & 0xFF00) | 0x00;
+                    }
+
+                    const nametable_offset: u16 = 0x2000;
+                    const addr: u16 = @bitCast(self.ppuaddr);
+                    const tile = try self.read(nametable_offset + (addr & 0x0FFF));
+
+                    self.framedata.nametable_entry = tile;
+                },
+                2 => {
+                    const attribute_table_offset: u16 = 0x23C0; // 0010_0011_1100_0000
+                    const nametable: u16 = @as(u16, self.ppuaddr.nametable) << 10; // 0000_nn00_0000_0000
+                    const coarse_y: u16 = (self.ppuaddr.coarse_y >> 2) << 3; // 0000_0000_00yy_y000
+                    const coarse_x: u16 = self.ppuaddr.coarse_x >> 2; // 0000_0000_0000_0xxx
+                    const addr = attribute_table_offset | nametable | coarse_y | coarse_x; // 0010_nn11_11yy_yxxx
+                    var attribute = try self.read(addr);
+
+                    if (self.ppuaddr.coarse_y & 0x02 > 0) attribute >>= 4;
+                    if (self.ppuaddr.coarse_x & 0x02 > 0) attribute >>= 2;
+                    attribute &= 0x3;
+
+                    self.framedata.buffer.attribute_byte = attribute;
+                },
+                4 => {
+                    var tile_addr: u16 = self.framedata.nametable_entry;
+                    tile_addr <<= 4; // Multiply by 16 since each pattern table entry is 16 bytes
+                    tile_addr |= if (self.ppuctrl.b) 0x1000 else 0x0000;
+                    self.framedata.buffer.bg_ptrn_lsb = try self.read(tile_addr + self.ppuaddr.fine_y);
+                },
+                6 => {
+                    var tile_addr: u16 = self.framedata.nametable_entry;
+                    tile_addr <<= 4; // Multiply by 16 since each pattern table entry is 16 bytes
+                    tile_addr |= if (self.ppuctrl.b) 0x1000 else 0x0000;
+                    const hi_byte_offset = 8;
+                    self.framedata.buffer.bg_ptrn_msb = try self.read(tile_addr + self.ppuaddr.fine_y + hi_byte_offset);
+                },
+                // Scroll register X increment
+                7 => increment_x: {
+                    if (!(self.ppumask.show_background or self.ppumask.show_sptires)) {
+                        break :increment_x;
+                    }
+
+                    if (self.ppuaddr.coarse_x == 31) {
+                        self.ppuaddr.coarse_x = 0;
+                        self.ppuaddr.nametable ^= 0b01; // Filp the horizontal nametable (nametable X bit)
+                        break :increment_x;
+                    }
+
+                    self.ppuaddr.coarse_x += 1;
+                },
+                else => {}, // Cycles 1, 3, and 5
+            }
+
+            // Scroll register Y increment at the end of the visible scanline
+            if (self.dots == 256) increment_y: {
+                if (!(self.ppumask.show_background or self.ppumask.show_sptires)) {
+                    break :increment_y;
+                }
+
+                if (self.ppuaddr.fine_y < 7) {
+                    self.ppuaddr.fine_y += 1;
+                    break :increment_y;
+                }
+
+                self.ppuaddr.fine_y = 0;
+
+                const y_limit: u5 = 29;
+                if (self.ppuaddr.coarse_y == y_limit) {
+                    self.ppuaddr.coarse_y = 0;
+                    self.ppuaddr.nametable ^= 0b10; // Filp the vertical nametable (nametable Y bit)
+                } else {
+                    self.ppuaddr.coarse_y += 1;
+                }
+            }
+
+            // Reset the horizontal scroll registers for the next scanline
+            if (self.dots == 257) {
+                if (self.ppumask.show_background or self.ppumask.show_sptires) {
+                    const mask: u2 = 0b01;
+                    self.ppuaddr.nametable = (self.ppuaddr.nametable & ~mask) | (self.temp_ppuaddr.nametable & mask);
+                    self.ppuaddr.coarse_x = self.temp_ppuaddr.coarse_x;
+                }
+            }
+
+            // Unused Nametable fetches
+            if (self.dots == 337 or self.dots == 339) {
+                const nametable_offset: u16 = 0x2000;
+                const addr: u16 = @bitCast(self.ppuaddr);
+                const tile = try self.read(nametable_offset + (addr & 0x0FFF));
+
+                self.framedata.nametable_entry = tile;
+            }
+        }
+    }
+
+    // Vertical blanking period
+    else if (self.scanlines == 241) {
+        if (self.dots == 1) {
+            self.ppustatus.vertical_blank = true;
+            if (self.ppuctrl.v) {
+                try self.console.cpu.?.nmi();
+            }
+        }
+    }
+
+    const is_visible_dot = (self.dots < visible_dots_per_scanline);
+    const is_visible_scanline = (self.scanlines > 0) and (self.scanlines < 240);
+
+    if (is_visible_dot and is_visible_scanline) {
+        if (self.ppumask.show_background) {
+            const shift_offset: u16 = @as(u16, 0x8000) >> @as(u4, @truncate(self.x));
+
+            const tile_lo: u2 = if ((self.framedata.shift_registers.bg_ptrn_lsb & shift_offset) > 0) 1 else 0;
+            const tile_hi: u2 = if ((self.framedata.shift_registers.bg_ptrn_msb & shift_offset) > 0) 2 else 0;
+            const pixel: u2 = tile_lo + tile_hi;
+
+            const attrib_lo: u2 = if ((self.framedata.shift_registers.attrib_lsb & shift_offset) > 0) 1 else 0;
+            const attrib_hi: u2 = if ((self.framedata.shift_registers.attrib_msb & shift_offset) > 0) 2 else 0;
+            const palette_id: u2 = attrib_lo + attrib_hi;
+            const palette = try self.getPaletteById(palette_id);
+
+            const x: usize = @intCast(self.dots);
+            const y: usize = @as(usize, @intCast(self.scanlines)) << 8;
+            self.buffer[x + y] = palette[pixel];
+        }
+    }
+
+    // Increment the dots and scanlines
+    self.dots += 1;
+    if (self.dots >= dots_per_scanline) {
+        self.dots = 0;
+        self.scanlines += 1;
+
+        if (self.scanlines >= scanlines_per_frame) {
+            self.scanlines = -1;
         }
     }
 }
