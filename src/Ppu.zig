@@ -228,8 +228,8 @@ pub fn step(self: *Ppu) !void {
             switch (@mod(self.dots - 1, 8)) {
                 0 => {
                     // Shift the buffered framedata before determining the next tile
-                    self.framedata.shift_registers.bg_ptrn_lsb = (self.framedata.shift_registers.bg_ptrn_lsb & 0xFF00) | self.framedata.buffer.bg_ptrn_lsb;
-                    self.framedata.shift_registers.bg_ptrn_msb = (self.framedata.shift_registers.bg_ptrn_msb & 0xFF00) | self.framedata.buffer.bg_ptrn_msb;
+                    self.framedata.shift_registers.bg_ptrn_lsb |= self.framedata.buffer.bg_ptrn_lsb;
+                    self.framedata.shift_registers.bg_ptrn_msb |= self.framedata.buffer.bg_ptrn_msb;
 
                     if ((self.framedata.buffer.attribute_byte & 0x01) > 0) {
                         self.framedata.shift_registers.attrib_lsb = (self.framedata.shift_registers.attrib_lsb & 0xFF00) | 0xFF;
