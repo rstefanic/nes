@@ -71,12 +71,11 @@ dots: i16 = 0,
 
 framedata: struct {
     nametable_entry: u8 = 0, // Index to locate a tile on the pattern table
-    attribute_entry: u8 = 0, // Color data for the pattern taken from the Attribute table
     bg_ptrn_lsb: u8 = 0, // Current background pattern tile's lsbits and msbits
     bg_ptrn_msb: u8 = 0,
 
     buffer: struct {
-        attribute_byte: u8 = 0,
+        attribute: u2 = 0,
         bg_ptrn_lsb: u8 = 0,
         bg_ptrn_msb: u8 = 0,
     } = .{},
@@ -231,16 +230,13 @@ pub fn step(self: *Ppu) !void {
                     self.framedata.shift_registers.bg_ptrn_lsb |= self.framedata.buffer.bg_ptrn_lsb;
                     self.framedata.shift_registers.bg_ptrn_msb |= self.framedata.buffer.bg_ptrn_msb;
 
-                    if ((self.framedata.buffer.attribute_byte & 0x01) > 0) {
-                        self.framedata.shift_registers.attrib_lsb = (self.framedata.shift_registers.attrib_lsb & 0xFF00) | 0xFF;
-                    } else {
-                        self.framedata.shift_registers.attrib_lsb = (self.framedata.shift_registers.attrib_lsb & 0xFF00) | 0x00;
+                    // Set the lower 8 bits of the attribute shift registers is necessary;
+                    // by defaut, they're unset due to the shifts that happen each cycle
+                    if ((self.framedata.buffer.attribute & 0x01) > 0) {
+                        self.framedata.shift_registers.attrib_lsb |= 0xFF;
                     }
-
-                    if ((self.framedata.buffer.attribute_byte & 0x02) > 0) {
-                        self.framedata.shift_registers.attrib_msb = (self.framedata.shift_registers.attrib_msb & 0xFF00) | 0xFF;
-                    } else {
-                        self.framedata.shift_registers.attrib_msb = (self.framedata.shift_registers.attrib_msb & 0xFF00) | 0x00;
+                    if ((self.framedata.buffer.attribute & 0x02) > 0) {
+                        self.framedata.shift_registers.attrib_msb |= 0xFF;
                     }
 
                     const nametable_offset: u16 = 0x2000;
@@ -255,13 +251,16 @@ pub fn step(self: *Ppu) !void {
                     const coarse_y: u16 = (self.ppuaddr.coarse_y >> 2) << 3; // 0000_0000_00yy_y000
                     const coarse_x: u16 = self.ppuaddr.coarse_x >> 2; // 0000_0000_0000_0xxx
                     const addr = attribute_table_offset | nametable | coarse_y | coarse_x; // 0010_nn11_11yy_yxxx
-                    var attribute = try self.read(addr);
+                    const attribute = try self.read(addr);
 
-                    if (self.ppuaddr.coarse_y & 0x02 > 0) attribute >>= 4;
-                    if (self.ppuaddr.coarse_x & 0x02 > 0) attribute >>= 2;
-                    attribute &= 0x3;
+                    // Determine which part of the attribute byte is needed for this tile based on the quadrant
+                    const quad: u3 = quadrant: {
+                        const x = self.ppuaddr.coarse_x >> 1; // Dividing by 2 gives us the current x & y quadrant
+                        const y = self.ppuaddr.coarse_y >> 1;
+                        break :quadrant @intCast(@mod(x, 2) + (@mod(y, 2) * 2));
+                    };
 
-                    self.framedata.buffer.attribute_byte = attribute;
+                    self.framedata.buffer.attribute = @truncate(attribute >> (quad * 2));
                 },
                 4 => {
                     var tile_addr: u16 = self.framedata.nametable_entry;
