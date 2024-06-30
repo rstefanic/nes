@@ -354,11 +354,11 @@ pub fn step(self: *Ppu) !void {
 
             const tile_lo: u2 = if ((self.framedata.shift_registers.bg_ptrn_lsb & shift_offset) > 0) 1 else 0;
             const tile_hi: u2 = if ((self.framedata.shift_registers.bg_ptrn_msb & shift_offset) > 0) 2 else 0;
-            const pixel: u2 = tile_lo + tile_hi;
+            const pixel: u2 = tile_hi | tile_lo;
 
             const attrib_lo: u2 = if ((self.framedata.shift_registers.attrib_lsb & shift_offset) > 0) 1 else 0;
             const attrib_hi: u2 = if ((self.framedata.shift_registers.attrib_msb & shift_offset) > 0) 2 else 0;
-            const palette_id: u2 = attrib_lo + attrib_hi;
+            const palette_id: u2 = attrib_hi | attrib_lo;
             const palette = try self.getPaletteById(palette_id);
 
             const x: usize = @intCast(self.dots);
