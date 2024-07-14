@@ -248,8 +248,8 @@ pub fn step(self: *Ppu) !void {
                 2 => {
                     const attribute_table_offset: u16 = 0x23C0; // 0010_0011_1100_0000
                     const nametable: u16 = @as(u16, self.ppuaddr.nametable) << 10; // 0000_nn00_0000_0000
-                    const coarse_y: u16 = (self.ppuaddr.coarse_y >> 2) << 3; // 0000_0000_00yy_y000
-                    const coarse_x: u16 = self.ppuaddr.coarse_x >> 2; // 0000_0000_0000_0xxx
+                    const coarse_y: u16 = (@as(u16, self.ppuaddr.coarse_y) >> 2) << 3; // 0000_0000_00yy_y000
+                    const coarse_x: u16 = @as(u16, self.ppuaddr.coarse_x) >> 2; // 0000_0000_0000_0xxx
                     const addr = attribute_table_offset | nametable | coarse_y | coarse_x; // 0010_nn11_11yy_yxxx
                     const attribute = try self.read(addr);
 
