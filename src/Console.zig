@@ -11,7 +11,7 @@ const Controller = @import("Controller.zig");
 cpu: ?*Cpu = null,
 cartridge: ?*Cartridge = null,
 ppu: ?*Ppu = null,
-controller: ?*Controller = null,
+controller1: ?*Controller = null,
 memory: [0x800]u8 = std.mem.zeroes([0x800]u8),
 
 pub fn step(self: *Console) !void {
@@ -40,6 +40,6 @@ pub fn connectPpu(self: *Console, ppu: *Ppu) void {
     self.ppu = ppu;
 }
 
-pub fn connectController(self: *Console, controller: *Controller) void {
-    self.controller = controller;
+pub fn connectController1(self: *Console, controller: *Controller) void {
+    self.controller1 = controller;
 }

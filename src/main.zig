@@ -23,7 +23,7 @@ pub fn main() !void {
     var cpu = Cpu{ .console = &console };
     var cartridge: ?Cartridge = null;
     var ppu = Ppu{ .console = &console };
-    var controller = Controller{ .console = &console };
+    var controller1 = Controller{ .console = &console };
 
     const args = try std.process.argsAlloc(allocator);
     if (args.len > 1) { // Treat any arguments as a filepath to a ROM
@@ -42,7 +42,7 @@ pub fn main() !void {
 
     console.connectCpu(&cpu);
     console.connectPpu(&ppu);
-    console.connectController(&controller);
+    console.connectController1(&controller1);
     try ppu.setupPatternTables();
     try cpu.reset();
     try ppu.reset();
@@ -118,14 +118,14 @@ pub fn main() !void {
 
         {
             // User Input
-            controller.buttons.a = raylib.IsKeyDown(raylib.KEY_Z);
-            controller.buttons.b = raylib.IsKeyDown(raylib.KEY_X);
-            controller.buttons.select = raylib.IsKeyDown(raylib.KEY_F);
-            controller.buttons.start = raylib.IsKeyDown(raylib.KEY_G);
-            controller.buttons.up = raylib.IsKeyDown(raylib.KEY_UP);
-            controller.buttons.down = raylib.IsKeyDown(raylib.KEY_DOWN);
-            controller.buttons.left = raylib.IsKeyDown(raylib.KEY_LEFT);
-            controller.buttons.right = raylib.IsKeyDown(raylib.KEY_RIGHT);
+            controller1.buttons.a = raylib.IsKeyDown(raylib.KEY_Z);
+            controller1.buttons.b = raylib.IsKeyDown(raylib.KEY_X);
+            controller1.buttons.select = raylib.IsKeyDown(raylib.KEY_F);
+            controller1.buttons.start = raylib.IsKeyDown(raylib.KEY_G);
+            controller1.buttons.up = raylib.IsKeyDown(raylib.KEY_UP);
+            controller1.buttons.down = raylib.IsKeyDown(raylib.KEY_DOWN);
+            controller1.buttons.left = raylib.IsKeyDown(raylib.KEY_LEFT);
+            controller1.buttons.right = raylib.IsKeyDown(raylib.KEY_RIGHT);
         }
 
         while (true) {

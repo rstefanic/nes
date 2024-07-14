@@ -83,7 +83,7 @@ fn read(self: *Cpu, address: u16) !u8 {
             };
         }
     } else if (address == 0x4016) {
-        if (self.console.controller) |controller| {
+        if (self.console.controller1) |controller| {
             return controller.read();
         }
     } else if (address == 0x4017) {
@@ -121,7 +121,7 @@ fn write(self: *Cpu, address: u16, value: u8) !void {
         }
         return;
     } else if (address == 0x4016) {
-        if (self.console.controller) |controller| {
+        if (self.console.controller1) |controller| {
             controller.write(value);
             return;
         }
