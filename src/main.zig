@@ -24,6 +24,7 @@ pub fn main() !void {
     var cartridge: ?Cartridge = null;
     var ppu = Ppu{ .console = &console };
     var controller1 = Controller{ .console = &console };
+    var controller2 = Controller{ .console = &console };
 
     const args = try std.process.argsAlloc(allocator);
     if (args.len > 1) { // Treat any arguments as a filepath to a ROM
@@ -43,6 +44,7 @@ pub fn main() !void {
     console.connectCpu(&cpu);
     console.connectPpu(&ppu);
     console.connectController1(&controller1);
+    console.connectController2(&controller2);
     try ppu.setupPatternTables();
     try cpu.reset();
     try ppu.reset();
@@ -116,8 +118,8 @@ pub fn main() !void {
         defer raylib.EndDrawing();
         raylib.ClearBackground(raylib.BLACK);
 
-        {
-            // User Input
+        { // User Input
+            // Controller 1
             controller1.buttons.a = raylib.IsKeyDown(raylib.KEY_Z);
             controller1.buttons.b = raylib.IsKeyDown(raylib.KEY_X);
             controller1.buttons.select = raylib.IsKeyDown(raylib.KEY_F);
@@ -126,6 +128,16 @@ pub fn main() !void {
             controller1.buttons.down = raylib.IsKeyDown(raylib.KEY_DOWN);
             controller1.buttons.left = raylib.IsKeyDown(raylib.KEY_LEFT);
             controller1.buttons.right = raylib.IsKeyDown(raylib.KEY_RIGHT);
+
+            // Controller 2
+            controller2.buttons.a = raylib.IsKeyDown(raylib.KEY_KP_0);
+            controller2.buttons.b = raylib.IsKeyDown(raylib.KEY_KP_DECIMAL);
+            controller2.buttons.select = raylib.IsKeyDown(raylib.KEY_KP_ADD);
+            controller2.buttons.start = raylib.IsKeyDown(raylib.KEY_KP_ENTER);
+            controller2.buttons.up = raylib.IsKeyDown(raylib.KEY_KP_8);
+            controller2.buttons.down = raylib.IsKeyDown(raylib.KEY_KP_5);
+            controller2.buttons.left = raylib.IsKeyDown(raylib.KEY_KP_4);
+            controller2.buttons.right = raylib.IsKeyDown(raylib.KEY_KP_6);
         }
 
         while (true) {

@@ -87,7 +87,9 @@ fn read(self: *Cpu, address: u16) !u8 {
             return controller.read();
         }
     } else if (address == 0x4017) {
-        return 0x00;
+        if (self.console.controller2) |controller| {
+            return controller.read();
+        }
     } else if (address >= 0x8000 and address <= 0xFFFF) {
         if (self.console.cartridge) |cartridge| {
             return cartridge.read(address);
@@ -123,8 +125,13 @@ fn write(self: *Cpu, address: u16, value: u8) !void {
     } else if (address == 0x4016) {
         if (self.console.controller1) |controller| {
             controller.write(value);
-            return;
         }
+        return;
+    } else if (address == 0x4017) {
+        if (self.console.controller2) |controller| {
+            controller.write(value);
+        }
+        return;
     } else if (address >= 0x4000 and address <= 0x401F) {
         return;
     } else if (address >= 0x4020 and address <= 0x7FFF) {

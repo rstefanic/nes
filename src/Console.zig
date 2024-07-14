@@ -12,6 +12,7 @@ cpu: ?*Cpu = null,
 cartridge: ?*Cartridge = null,
 ppu: ?*Ppu = null,
 controller1: ?*Controller = null,
+controller2: ?*Controller = null,
 memory: [0x800]u8 = std.mem.zeroes([0x800]u8),
 
 pub fn step(self: *Console) !void {
@@ -42,4 +43,8 @@ pub fn connectPpu(self: *Console, ppu: *Ppu) void {
 
 pub fn connectController1(self: *Console, controller: *Controller) void {
     self.controller1 = controller;
+}
+
+pub fn connectController2(self: *Console, controller: *Controller) void {
+    self.controller2 = controller;
 }
