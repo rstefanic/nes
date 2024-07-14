@@ -85,6 +85,32 @@ pub fn main() !void {
     defer raylib.UnloadTexture(right_pattern_table_tex);
     var right_pattern_table_buffer: [256 * 64]raylib.Color = [_]raylib.Color{raylib.GREEN} ** (256 * 64);
 
+    // Palette Viewer
+    const palette_display_w = 128;
+    const palette_display_h = 32;
+    const palette_count = 8;
+    const palettes_display: [palette_count]raylib.Rectangle = [_]raylib.Rectangle{raylib.Rectangle{ .x = 0, .y = 0, .width = palette_display_w, .height = palette_display_h }} ** palette_count;
+    var palettes_img: [palette_count]raylib.Image = .{};
+    var palette_textures: [palette_count]raylib.Texture2D = .{};
+    var palette_buffer: [palette_count][palette_display_w * palette_display_h]raylib.Color = .{[_]raylib.Color{raylib.BLACK} ** (palette_display_w * palette_display_h)} ** palette_count;
+
+    { // Create the palette images and textures
+        var i: usize = 0;
+        while (i < palette_count) : (i += 1) {
+            palettes_img[i] = raylib.GenImageColor(palette_display_w, palette_display_h, raylib.BLACK);
+            palette_textures[i] = raylib.LoadTextureFromImage(palettes_img[i]);
+        }
+    }
+
+    // Unload the allocated images and textures together at the end
+    defer {
+        var i: usize = 0;
+        while (i < palette_count) : (i += 1) {
+            raylib.UnloadImage(palettes_img[i]);
+            raylib.UnloadTexture(palette_textures[i]);
+        }
+    }
+
     while (!raylib.WindowShouldClose()) {
         raylib.BeginDrawing();
         defer raylib.EndDrawing();
@@ -203,6 +229,37 @@ pub fn main() !void {
             }
         }
 
+        { // Build BG and FG palettes for debugging
+            var i: u8 = 0;
+            while (i < palette_count) : (i += 1) {
+                const palette = try ppu.getPaletteById(i);
+                var buf = palette_buffer[i];
+
+                var j: usize = 0;
+                while (j < 4) : (j += 1) { // There are 4 colors per palette
+                    const color = ppu.palette.colors[palette[j]];
+                    const offset = palette_display_h * j;
+
+                    // Each of the 4 colors that make up a palette will be displayed as 32x32 rectangles
+                    var k: usize = 0;
+                    while (k < 32) : (k += 1) {
+                        var l: usize = 0;
+                        while (l < 32) : (l += 1) {
+                            const idx = (offset + k) + (l * palette_display_w);
+                            buf[idx] = raylib.Color{
+                                .r = color.r,
+                                .g = color.g,
+                                .b = color.b,
+                                .a = 255, // alpha
+                            };
+                        }
+                    }
+                }
+
+                raylib.UpdateTexture(palette_textures[i], &buf);
+            }
+        }
+
         { // Draw PPU Buffer
             var i: usize = 0;
             while (i < ppu.buffer.len) : (i += 1) {
@@ -223,6 +280,40 @@ pub fn main() !void {
         raylib.DrawTexturePro(output_texture, output_display, upscaled_output_display, raylib.Vector2{ .x = -5, .y = -5 }, 0.0, raylib.WHITE);
         raylib.DrawTextureRec(left_pattern_table_texture, left_pattern_table_display, raylib.Vector2{ .x = 850, .y = 5 }, raylib.WHITE);
         raylib.DrawTextureRec(right_pattern_table_tex, right_pattern_table_display, raylib.Vector2{ .x = 1050, .y = 5 }, raylib.WHITE);
+
+        {
+            const bg_pal_column = 800;
+            const fg_pal_column = 1050;
+            const y_start = 500;
+            const y_padding = 38;
+
+            var options: DrawTextOptions = .{
+                .pos_x = bg_pal_column,
+                .pos_y = y_start - y_padding, // palettes start at `y_start`; add a label above it
+                .font_size = 24,
+            };
+
+            try drawText(allocator, "BG Palettes", .{}, options);
+            options.pos_x = fg_pal_column;
+            try drawText(allocator, "FG Palettes", .{}, options);
+
+            var x: f32 = bg_pal_column;
+            var y: f32 = y_start;
+
+            var i: usize = 0;
+            while (i < 8) : (i += 1) {
+                raylib.DrawTextureRec(palette_textures[i], palettes_display[i], raylib.Vector2{ .x = x, .y = y }, raylib.WHITE);
+
+                // The palette buffer blocks are 32 pixels high.
+                // 6 pixels are added for spacing here
+                y += y_padding;
+
+                if (@mod(i + 1, 4) == 0) {
+                    x = fg_pal_column;
+                    y = y_start; // reset y
+                }
+            }
+        }
 
         // Screen Drawing
         const y_spacing = 42;
