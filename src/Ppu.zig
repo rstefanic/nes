@@ -23,6 +23,19 @@ const PpuAddress = packed struct(u16) {
     _unused: u1 = 0,
 };
 
+const Sprite = packed struct(u32) {
+    y: u8 = 0,
+    index: u8 = 0,
+    attributes: packed struct(u8) {
+        palette: u2 = 0,
+        _unused: u3 = 0,
+        priority: bool = false,
+        flip_horizonal: bool = false,
+        flip_vertical: bool = false,
+    } = .{},
+    x: u8 = 0,
+};
+
 console: *Console,
 
 ppuctrl: packed struct(u8) {
@@ -97,6 +110,7 @@ buffer: [256 * 240]u8 = [_]u8{0x2C} ** (256 * 240),
 
 palette_ram: [32]u8 = [_]u8{0x00} ** 32,
 nametables: [0x800]u8 = std.mem.zeroes([0x800]u8),
+oam: [64]Sprite = [_]Sprite{.{}} ** 64,
 
 // Pattern Tables define the raw image data
 left_pattern_table: [256]Tile = undefined,
