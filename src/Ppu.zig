@@ -67,7 +67,6 @@ ppustatus: packed struct(u8) {
 } = .{},
 
 oamaddr: u8 = 0,
-oamdata: u8 = 0,
 ppuscroll: u8 = 0,
 ppudata: u8 = 0,
 oamdma: u8 = 0,
@@ -132,7 +131,15 @@ pub inline fn readPpustatus(self: *Ppu) u8 {
 }
 
 pub inline fn readOamdata(self: *Ppu) u8 {
-    return self.oamdata;
+    // OAM is 256 bytes of 64 sprites where each sprite is 4 bytes
+    const idx = self.oamaddr >> 2; // divide by 4 to find the correct Sprite in the OAM list
+
+    return switch (@mod(self.oamaddr, 4)) {
+        0 => self.oam[idx].y,
+        1 => self.oam[idx].index,
+        2 => @bitCast(self.oam[idx].attributes),
+        else => self.oam[idx].x,
+    };
 }
 
 pub inline fn readPpudata(self: *Ppu) !u8 {
@@ -164,7 +171,17 @@ pub inline fn writeOamaddr(self: *Ppu, value: u8) void {
 }
 
 pub inline fn writeOamdata(self: *Ppu, value: u8) void {
-    self.oamdata = value;
+    // OAM is 256 bytes of 64 sprites where each sprite is 4 bytes
+    const idx = self.oamaddr >> 2; // divide by 4 to find the correct Sprite in the OAM list
+
+    switch (@mod(self.oamaddr, 4)) {
+        0 => self.oam[idx].y = value,
+        1 => self.oam[idx].index = value,
+        2 => self.oam[idx].attributes = @bitCast(value),
+        else => self.oam[idx].x = value,
+    }
+
+    self.oamaddr = self.oamaddr +% 1;
 }
 
 pub inline fn writePpuscroll(self: *Ppu, value: u8) void {
