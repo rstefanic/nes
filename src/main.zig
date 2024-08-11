@@ -336,7 +336,7 @@ pub fn main() !void {
         };
 
         // Draw CPU Information
-        try drawText(allocator, "cycles: {d}", .{cpu.cycles}, options);
+        try drawText(allocator, "cycles: {d}", .{console.cycles}, options);
 
         options.pos_y += y_spacing;
         try drawText(allocator, "a: 0x{x:0>2}", .{cpu.a}, options);

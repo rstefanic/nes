@@ -8,8 +8,10 @@ const testing = std.testing;
 // A reference to the console so that we can read/write to memory
 console: *Console,
 
-// Track the number of cycles
-cycles: u64 = 0,
+// Keeps track of the remaining cycles left to execute the current instruction.
+// Execution time varies depending on the instruction. New instructions can
+// only be fetched, decoded, and executed when this counter hits 0.
+cycles_remaining: u8 = 0,
 
 // Registers
 a: u8 = 0,
@@ -43,7 +45,7 @@ pub fn reset(self: *Cpu) !void {
     // discards them) and copies the the value of the reset vector into the PC.
     // So a RESET takes 7 cycles and the stack has 3 fake push operations that
     // decrements the stack pointer 3 times, and interrupt disable is set.
-    self.cycles = 7;
+    self.cycles_remaining = 7;
     self.sp = 0xFD;
     self.status = .{};
     self.status.interrupt_disable = true;
@@ -171,6 +173,11 @@ fn stackPop(self: *Cpu) !u8 {
 }
 
 pub fn step(self: *Cpu) !void {
+    if (self.cycles_remaining > 0) {
+        self.cycles_remaining -= 1;
+        return;
+    }
+
     const byte = try self.fetch();
     const ins = Instruction.decode(byte);
     try self.execute(ins);
@@ -393,7 +400,7 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .ALR, .ANC, .ANE, .ARR, .JAM, .LAS, .LXA, .SBX, .SHA, .SHX, .SHY, .TAS => self.nop(),
     }
 
-    self.cycles += ins.cycles + additional_cycles;
+    self.cycles_remaining += ins.cycles + additional_cycles;
 }
 
 inline fn handleZeroFlagStatus(self: *Cpu, byte: u8) void {
@@ -917,7 +924,7 @@ pub fn irq(self: *Cpu) !void {
     const lo = try self.read(0xFFFE);
     const hi = try self.read(0xFFFF);
     self.pc = makeWord(hi, lo);
-    self.cycles += 8;
+    self.cycles_remaining += 8;
 }
 
 pub fn nmi(self: *Cpu) !void {
@@ -930,7 +937,7 @@ pub fn nmi(self: *Cpu) !void {
     const lo = try self.read(0xFFFA);
     const hi = try self.read(0xFFFB);
     self.pc = makeWord(hi, lo);
-    self.cycles += 8;
+    self.cycles_remaining += 8;
 }
 
 fn nop(self: *Cpu) void {
@@ -1113,7 +1120,7 @@ test "LDA Absolute" {
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.a);
-    try testing.expectEqual(@as(u64, 4), cpu.cycles);
+    try testing.expectEqual(@as(u64, 4), cpu.cycles_remaining);
 }
 
 test "LDA Absolute,X" {
@@ -1129,7 +1136,7 @@ test "LDA Absolute,X" {
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.a);
-    try testing.expectEqual(@as(u64, 4), cpu.cycles);
+    try testing.expectEqual(@as(u64, 4), cpu.cycles_remaining);
 }
 
 test "LDA Absolute,X add additional cycle for crossing page boundaries" {
@@ -1145,7 +1152,7 @@ test "LDA Absolute,X add additional cycle for crossing page boundaries" {
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.a);
-    try testing.expectEqual(@as(u64, 5), cpu.cycles);
+    try testing.expectEqual(@as(u64, 5), cpu.cycles_remaining);
 }
 
 test "LDA Absolute,Y" {
@@ -1721,7 +1728,7 @@ test "BMI branching adds an additional cycle" {
     try cpu.step();
 
     try testing.expectEqual(expected_address, cpu.pc);
-    try testing.expectEqual(@as(u64, 3), cpu.cycles);
+    try testing.expectEqual(@as(u64, 3), cpu.cycles_remaining);
 }
 
 test "BMI branching with a page boundary adds two additional cycles" {
@@ -1736,7 +1743,7 @@ test "BMI branching with a page boundary adds two additional cycles" {
     try cpu.step();
 
     try testing.expectEqual(expected_address, cpu.pc);
-    try testing.expectEqual(@as(u64, 4), cpu.cycles);
+    try testing.expectEqual(@as(u64, 4), cpu.cycles_remaining);
 }
 
 test "BPL" {

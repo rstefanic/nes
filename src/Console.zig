@@ -14,19 +14,16 @@ ppu: ?*Ppu = null,
 controller1: ?*Controller = null,
 controller2: ?*Controller = null,
 memory: [0x800]u8 = std.mem.zeroes([0x800]u8),
+cycles: u64 = 0,
 
 pub fn step(self: *Console) !void {
-    const start_cycle_count = self.cpu.?.cycles;
-    try self.cpu.?.step();
-    const end_cycle_count = self.cpu.?.cycles;
-
-    // The PPU runs 3 cycles for every CPU cycle
-    var cycles = end_cycle_count - start_cycle_count;
-    while (cycles > 0) : (cycles -= 1) {
-        try self.ppu.?.step();
-        try self.ppu.?.step();
-        try self.ppu.?.step();
+    if (@mod(self.cycles, 3) == 0) {
+        try self.cpu.?.step();
     }
+
+    try self.ppu.?.step();
+
+    self.cycles += 1;
 }
 
 pub fn connectCpu(self: *Console, cpu: *Cpu) void {
