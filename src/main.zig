@@ -13,6 +13,7 @@ const raylib = @cImport({
 
 const WIDTH = 1280;
 const HEIGHT = 768;
+const TIME_PER_FRAME = 1.0 / 60.0;
 
 pub fn main() !void {
     var buffer: [1000]u8 = undefined;
@@ -140,9 +141,12 @@ pub fn main() !void {
             controller2.buttons.right = raylib.IsKeyDown(raylib.KEY_KP_6);
         }
 
-        while (true) {
+        // Simulate enough of the Console to draw a frame every second
+        const start = raylib.GetTime();
+        var dt: f64 = 0;
+        while (dt < TIME_PER_FRAME) {
             try console.step();
-            if (console.ppu.?.scanlines == -1) break;
+            dt = raylib.GetTime() - start;
         }
 
         if (raylib.IsFileDropped()) {
