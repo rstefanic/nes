@@ -70,7 +70,7 @@ const CpuMemoryAccessError = error{
     MissingCartridge,
 };
 
-fn read(self: *Cpu, address: u16) !u8 {
+pub fn read(self: *Cpu, address: u16) !u8 {
     if (address >= 0x0000 and address <= 0x1FFF) {
         return self.console.memory[address & 0x07FF];
     } else if (address >= 0x2000 and address <= 0x3FFF) {
@@ -123,6 +123,11 @@ fn write(self: *Cpu, address: u16, value: u8) !void {
                 else => return CpuMemoryAccessError.InvalidPpuWriteAddress,
             }
         }
+        return;
+    } else if (address == 0x4014) {
+        self.console.dma.page = value;
+        self.console.dma.addr = 0;
+        self.console.dma.in_progress = true;
         return;
     } else if (address == 0x4016) {
         if (self.console.controller1) |controller| {
