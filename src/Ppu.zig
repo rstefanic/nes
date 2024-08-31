@@ -41,7 +41,7 @@ console: *Console,
 ppuctrl: packed struct(u8) {
     nametable_addr: u2 = 0,
     i: bool = false, // VRAM address Increment -- false adds 1, true adds 32
-    s: bool = false,
+    s: bool = false, // sprite pattern table address for 8x8 sprites
     b: bool = false,
     h: bool = false,
     p: bool = false,
@@ -110,6 +110,12 @@ buffer: [256 * 240]u8 = [_]u8{0x2C} ** (256 * 240),
 palette_ram: [32]u8 = [_]u8{0x00} ** 32,
 nametables: [0x800]u8 = std.mem.zeroes([0x800]u8),
 oam: [64]Sprite = [_]Sprite{.{}} ** 64,
+
+scanline_sprites: struct {
+    // indexes into the OAM
+    sprites: [8]u8 = [_]u8{0} ** 8,
+    count: u8 = 0,
+} = .{},
 
 // Pattern Tables define the raw image data
 left_pattern_table: [256]Tile = undefined,
@@ -363,6 +369,30 @@ pub fn step(self: *Ppu) !void {
                 self.framedata.nametable_entry = tile;
             }
         }
+
+        // Sprite evaluation for next scanline
+        if (self.dots == 340) {
+            var count: u8 = 0;
+            var idx: u8 = 0;
+            while (idx < 64) : (idx += 1) sprite_eval: {
+                const sprite = self.oam[idx];
+                const diff: i16 = self.scanlines - sprite.y;
+                const sprite_height: usize = if (self.ppuctrl.h) 16 else 8;
+
+                if (diff >= 0 and diff < sprite_height) {
+                    if (count < 8) {
+                        self.scanline_sprites.sprites[count] = idx;
+                        count += 1;
+                    } else {
+                        // Set the sprite overflow flag and exit if we reach this
+                        self.ppustatus.sprite_overflow = true;
+                        break :sprite_eval;
+                    }
+                }
+            }
+
+            self.scanline_sprites.count = count;
+        }
     }
 
     // Vertical blanking period
@@ -379,6 +409,9 @@ pub fn step(self: *Ppu) !void {
     const is_visible_scanline = (self.scanlines > 0) and (self.scanlines < 240);
 
     if (is_visible_dot and is_visible_scanline) {
+        const buffer_x: usize = @intCast(self.dots);
+        const buffer_y: usize = @as(usize, @intCast(self.scanlines)) << 8;
+
         if (self.ppumask.show_background) {
             const shift_offset: u16 = @as(u16, 0x8000) >> @as(u4, @truncate(self.x));
 
@@ -391,9 +424,43 @@ pub fn step(self: *Ppu) !void {
             const palette_id: u2 = attrib_hi | attrib_lo;
             const palette = try self.getPaletteById(palette_id);
 
-            const x: usize = @intCast(self.dots);
-            const y: usize = @as(usize, @intCast(self.scanlines)) << 8;
-            self.buffer[x + y] = palette[pixel];
+            self.buffer[buffer_x + buffer_y] = palette[pixel];
+        }
+
+        if (self.ppumask.show_sprites) {
+            // We've determined which sprites to draw by going through the OAM
+            // list already. Sprites in OAM are listed by priority, iterating
+            // through them in reverse here will automatically overwrite the
+            // lower priority sprites with the higher priority ones.
+            var i: usize = self.scanline_sprites.count;
+            std.debug.assert(i <= 8);
+            while (i > 0) : (i -= 1) {
+                const idx = self.scanline_sprites.sprites[i - 1];
+                const sprite = self.oam[idx];
+                const diff = self.dots - sprite.x;
+
+                if (diff >= 0 and diff <= 8) {
+                    const palette = try self.getPaletteById(@as(u8, sprite.attributes.palette) + 4); // +4 to access the FG palettes
+
+                    var tile_addr: u16 = sprite.index;
+                    tile_addr <<= 4; // Multiply by 16 since each pattern table entry is 16 bytes
+                    tile_addr |= if (self.ppuctrl.s) 0x1000 else 0x0000;
+
+                    var tile_lo = try self.read(tile_addr);
+                    var tile_hi = try self.read(tile_addr + 8);
+
+                    if (sprite.attributes.flip_horizonal) {
+                        tile_lo = @bitReverse(tile_lo);
+                        tile_hi = @bitReverse(tile_hi);
+                    }
+
+                    const pixel_lo: u2 = if ((tile_lo & diff) > 0) 1 else 0;
+                    const pixel_hi: u2 = if ((tile_hi & diff) > 0) 2 else 0;
+                    const pixel: u2 = pixel_hi | pixel_lo;
+
+                    self.buffer[buffer_x + buffer_y] = palette[pixel];
+                }
+            }
         }
     }
 
