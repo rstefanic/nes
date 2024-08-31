@@ -53,7 +53,7 @@ ppumask: packed struct(u8) {
     show_leftmost_background: bool = false,
     show_leftmost_sprites: bool = false,
     show_background: bool = false,
-    show_sptires: bool = false,
+    show_sprites: bool = false,
     r: bool = false,
     g: bool = false,
     b: bool = false,
@@ -235,7 +235,7 @@ pub fn step(self: *Ppu) !void {
 
         // Reset the vertical scroll registers for the next frame
         if (self.dots >= 280 and self.dots <= 304) {
-            if (self.ppumask.show_background or self.ppumask.show_sptires) {
+            if (self.ppumask.show_background or self.ppumask.show_sprites) {
                 const mask: u2 = 0b10;
                 self.ppuaddr.nametable = (self.ppuaddr.nametable & ~mask) | (self.temp_ppuaddr.nametable & mask);
                 self.ppuaddr.coarse_y = self.temp_ppuaddr.coarse_y;
@@ -308,7 +308,7 @@ pub fn step(self: *Ppu) !void {
                 },
                 // Scroll register X increment
                 7 => increment_x: {
-                    if (!(self.ppumask.show_background or self.ppumask.show_sptires)) {
+                    if (!(self.ppumask.show_background or self.ppumask.show_sprites)) {
                         break :increment_x;
                     }
 
@@ -325,7 +325,7 @@ pub fn step(self: *Ppu) !void {
 
             // Scroll register Y increment at the end of the visible scanline
             if (self.dots == 256) increment_y: {
-                if (!(self.ppumask.show_background or self.ppumask.show_sptires)) {
+                if (!(self.ppumask.show_background or self.ppumask.show_sprites)) {
                     break :increment_y;
                 }
 
@@ -347,7 +347,7 @@ pub fn step(self: *Ppu) !void {
 
             // Reset the horizontal scroll registers for the next scanline
             if (self.dots == 257) {
-                if (self.ppumask.show_background or self.ppumask.show_sptires) {
+                if (self.ppumask.show_background or self.ppumask.show_sprites) {
                     const mask: u2 = 0b01;
                     self.ppuaddr.nametable = (self.ppuaddr.nametable & ~mask) | (self.temp_ppuaddr.nametable & mask);
                     self.ppuaddr.coarse_x = self.temp_ppuaddr.coarse_x;
