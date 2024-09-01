@@ -437,9 +437,9 @@ pub fn step(self: *Ppu) !void {
             while (i > 0) : (i -= 1) {
                 const idx = self.scanline_sprites.sprites[i - 1];
                 const sprite = self.oam[idx];
-                const diff = self.dots - sprite.x;
+                const x_diff = self.dots - sprite.x;
 
-                if (diff >= 0 and diff <= 8) {
+                if (x_diff >= 0 and x_diff < 8) {
                     const palette = try self.getPaletteById(@as(u8, sprite.attributes.palette) + 4); // +4 to access the FG palettes
 
                     var tile_addr: u16 = sprite.index;
@@ -454,8 +454,9 @@ pub fn step(self: *Ppu) !void {
                         tile_hi = @bitReverse(tile_hi);
                     }
 
-                    const pixel_lo: u2 = if ((tile_lo & diff) > 0) 1 else 0;
-                    const pixel_hi: u2 = if ((tile_hi & diff) > 0) 2 else 0;
+                    const pixel_offset = @as(u8, 0x01) << @as(u3, @intCast(x_diff));
+                    const pixel_lo: u2 = if ((tile_lo & pixel_offset) > 0) 1 else 0;
+                    const pixel_hi: u2 = if ((tile_hi & pixel_offset) > 0) 2 else 0;
                     const pixel: u2 = pixel_hi | pixel_lo;
 
                     self.buffer[buffer_x + buffer_y] = palette[pixel];
