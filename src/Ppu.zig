@@ -376,7 +376,9 @@ pub fn step(self: *Ppu) !void {
             var idx: u8 = 0;
             while (idx < 64) : (idx += 1) sprite_eval: {
                 const sprite = self.oam[idx];
-                const diff: i16 = self.scanlines - sprite.y;
+
+                // Add one to the diff since we're looking for sprites on the next scanline
+                const diff: i16 = self.scanlines - sprite.y + 1;
                 const sprite_height: usize = if (self.ppuctrl.h) 16 else 8;
 
                 if (diff >= 0 and diff < sprite_height) {
