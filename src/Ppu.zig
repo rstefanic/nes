@@ -458,7 +458,7 @@ pub fn step(self: *Ppu) !void {
                         tile_hi = @bitReverse(tile_hi);
                     }
 
-                    const pixel_offset = @as(u8, 0x01) << @as(u3, @intCast(x_diff));
+                    const pixel_offset = @as(u8, 0x80) >> @as(u3, @intCast(x_diff));
                     const pixel_lo: u2 = if ((tile_lo & pixel_offset) > 0) 1 else 0;
                     const pixel_hi: u2 = if ((tile_hi & pixel_offset) > 0) 2 else 0;
                     const pixel: u2 = pixel_hi | pixel_lo;
