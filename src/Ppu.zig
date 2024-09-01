@@ -438,6 +438,7 @@ pub fn step(self: *Ppu) !void {
                 const idx = self.scanline_sprites.sprites[i - 1];
                 const sprite = self.oam[idx];
                 const x_diff = self.dots - sprite.x;
+                const y_diff = self.scanlines - sprite.y;
 
                 if (x_diff >= 0 and x_diff < 8) {
                     const palette = try self.getPaletteById(@as(u8, sprite.attributes.palette) + 4); // +4 to access the FG palettes
@@ -445,6 +446,7 @@ pub fn step(self: *Ppu) !void {
                     var tile_addr: u16 = sprite.index;
                     tile_addr <<= 4; // Multiply by 16 since each pattern table entry is 16 bytes
                     tile_addr |= if (self.ppuctrl.s) 0x1000 else 0x0000;
+                    tile_addr |= @as(u16, @intCast(y_diff));
 
                     var tile_lo = try self.read(tile_addr);
                     var tile_hi = try self.read(tile_addr + 8);
