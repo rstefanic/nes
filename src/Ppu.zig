@@ -30,7 +30,7 @@ const Sprite = packed struct(u32) {
         palette: u2 = 0,
         _unused: u3 = 0,
         priority: bool = false,
-        flip_horizonal: bool = false,
+        flip_horizontal: bool = false,
         flip_vertical: bool = false,
     } = .{},
     x: u8 = 0,
@@ -453,7 +453,7 @@ pub fn step(self: *Ppu) !void {
                     var tile_lo = try self.read(tile_addr);
                     var tile_hi = try self.read(tile_addr + 8);
 
-                    if (sprite.attributes.flip_horizonal) {
+                    if (sprite.attributes.flip_horizontal) {
                         tile_lo = @bitReverse(tile_lo);
                         tile_hi = @bitReverse(tile_hi);
                     }
