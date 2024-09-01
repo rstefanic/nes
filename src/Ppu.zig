@@ -413,6 +413,8 @@ pub fn step(self: *Ppu) !void {
     if (is_visible_dot and is_visible_scanline) {
         const buffer_x: usize = @intCast(self.dots);
         const buffer_y: usize = @as(usize, @intCast(self.scanlines)) << 8;
+        var bg_pixel: u8 = 0x00; // start with both values as transparent
+        var fg_pixel: u8 = 0x00;
 
         if (self.ppumask.show_background) {
             const shift_offset: u16 = @as(u16, 0x8000) >> @as(u4, @truncate(self.x));
@@ -426,7 +428,7 @@ pub fn step(self: *Ppu) !void {
             const palette_id: u2 = attrib_hi | attrib_lo;
             const palette = try self.getPaletteById(palette_id);
 
-            self.buffer[buffer_x + buffer_y] = palette[pixel];
+            bg_pixel = palette[pixel];
         }
 
         if (self.ppumask.show_sprites) {
@@ -463,10 +465,15 @@ pub fn step(self: *Ppu) !void {
                     const pixel_hi: u2 = if ((tile_hi & pixel_offset) > 0) 2 else 0;
                     const pixel: u2 = pixel_hi | pixel_lo;
 
-                    self.buffer[buffer_x + buffer_y] = palette[pixel];
+                    fg_pixel = palette[pixel];
                 }
             }
         }
+
+        self.buffer[buffer_x + buffer_y] = switch (fg_pixel) {
+            0x00 => bg_pixel, // Use the background if the FG is transparent
+            else => fg_pixel,
+        };
     }
 
     // Increment the dots and scanlines
