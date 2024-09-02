@@ -411,22 +411,22 @@ pub fn step(self: *Ppu) !void {
     const is_visible_scanline = (self.scanlines > 0) and (self.scanlines < 240);
 
     if (is_visible_dot and is_visible_scanline) {
-        var bg_pixel: u8 = 0x00; // start with both values as transparent
-        var fg_pixel: u8 = 0x00;
+        var pixel: u8 = 0x00;
 
         if (self.ppumask.show_background) {
             const shift_offset: u16 = @as(u16, 0x8000) >> @as(u4, @truncate(self.x));
 
             const tile_lo: u2 = if ((self.framedata.shift_registers.bg_ptrn_lsb & shift_offset) > 0) 1 else 0;
             const tile_hi: u2 = if ((self.framedata.shift_registers.bg_ptrn_msb & shift_offset) > 0) 2 else 0;
-            const pixel: u2 = tile_hi | tile_lo;
+            const bg_pixel: u2 = tile_hi | tile_lo;
 
             const attrib_lo: u2 = if ((self.framedata.shift_registers.attrib_lsb & shift_offset) > 0) 1 else 0;
             const attrib_hi: u2 = if ((self.framedata.shift_registers.attrib_msb & shift_offset) > 0) 2 else 0;
             const palette_id: u2 = attrib_hi | attrib_lo;
             const palette = try self.getPaletteById(palette_id);
 
-            bg_pixel = palette[pixel];
+            // Assume the pixel to be rendered is the background pixel
+            pixel = palette[bg_pixel];
         }
 
         if (self.ppumask.show_sprites) {
@@ -442,7 +442,13 @@ pub fn step(self: *Ppu) !void {
                 const x_diff = self.dots - sprite.x;
                 const y_diff = self.scanlines - sprite.y;
 
-                if (x_diff >= 0 and x_diff < 8) {
+                if (x_diff >= 0 and x_diff < 8) sprite: {
+                    // When priority is set, then that means the BG is in front
+                    // of the sprite So we do not have to compute the fg pixel
+                    if (sprite.attributes.priority) {
+                        break :sprite;
+                    }
+
                     const palette = try self.getPaletteById(@as(u8, sprite.attributes.palette) + 4); // +4 to access the FG palettes
 
                     var tile_addr: u16 = sprite.index;
@@ -461,19 +467,20 @@ pub fn step(self: *Ppu) !void {
                     const pixel_offset = @as(u8, 0x80) >> @as(u3, @intCast(x_diff));
                     const pixel_lo: u2 = if ((tile_lo & pixel_offset) > 0) 1 else 0;
                     const pixel_hi: u2 = if ((tile_hi & pixel_offset) > 0) 2 else 0;
-                    const pixel: u2 = pixel_hi | pixel_lo;
+                    const fg_pixel: u2 = pixel_hi | pixel_lo;
 
-                    fg_pixel = palette[pixel];
+                    if (fg_pixel == 0x00) { // Is this sprite pixel transparent?
+                        break :sprite; // Then use the background pixel
+                    }
+
+                    pixel = palette[fg_pixel];
                 }
             }
         }
 
         const x: usize = @intCast(self.dots);
         const y: usize = @as(usize, @intCast(self.scanlines)) << 8;
-        self.buffer[x + y] = switch (fg_pixel) {
-            0x00 => bg_pixel, // Use the background if the FG is transparent
-            else => fg_pixel,
-        };
+        self.buffer[x + y] = pixel;
     }
 
     // Increment the dots and scanlines
