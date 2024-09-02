@@ -411,8 +411,6 @@ pub fn step(self: *Ppu) !void {
     const is_visible_scanline = (self.scanlines > 0) and (self.scanlines < 240);
 
     if (is_visible_dot and is_visible_scanline) {
-        const buffer_x: usize = @intCast(self.dots);
-        const buffer_y: usize = @as(usize, @intCast(self.scanlines)) << 8;
         var bg_pixel: u8 = 0x00; // start with both values as transparent
         var fg_pixel: u8 = 0x00;
 
@@ -470,7 +468,9 @@ pub fn step(self: *Ppu) !void {
             }
         }
 
-        self.buffer[buffer_x + buffer_y] = switch (fg_pixel) {
+        const x: usize = @intCast(self.dots);
+        const y: usize = @as(usize, @intCast(self.scanlines)) << 8;
+        self.buffer[x + y] = switch (fg_pixel) {
             0x00 => bg_pixel, // Use the background if the FG is transparent
             else => fg_pixel,
         };
