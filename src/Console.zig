@@ -61,13 +61,6 @@ pub fn step(self: *Console) !void {
                 self.dma.in_progress = false;
                 self.dma.in_sync = false;
                 self.dma.page = 0;
-
-                // Print the first half of the OAM data for debugging
-                var i: usize = 0;
-                while (i < 32) : (i += 1) {
-                    const oam = self.ppu.?.oam[i];
-                    std.debug.print("oam[{}] -- .x: {}, .y: {}, ID: {x}\n", .{ i, oam.x, oam.y, oam.index });
-                }
             }
         }
     } else {
