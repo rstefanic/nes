@@ -454,7 +454,13 @@ pub fn step(self: *Ppu) !void {
                     var tile_addr: u16 = sprite.index;
                     tile_addr <<= 4; // Multiply by 16 since each pattern table entry is 16 bytes
                     tile_addr |= if (self.ppuctrl.s) 0x1000 else 0x0000;
-                    tile_addr |= @as(u16, @intCast(y_diff));
+
+                    if (sprite.attributes.flip_vertical) {
+                        const sprite_height: u16 = if (self.ppuctrl.h) 16 else 8;
+                        tile_addr |= (sprite_height - 1) - @as(u16, @intCast(y_diff));
+                    } else {
+                        tile_addr |= @as(u16, @intCast(y_diff));
+                    }
 
                     var tile_lo = try self.read(tile_addr);
                     var tile_hi = try self.read(tile_addr + 8);
