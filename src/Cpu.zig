@@ -213,7 +213,7 @@ fn execute(self: *Cpu, ins: Instruction) !void {
         .Relative => {
             const offset: i8 = @bitCast(try self.fetch());
             const effective_address = if (offset < 0)
-                self.pc - @as(u16, @intCast(offset * -1))
+                self.pc - @abs(offset)
             else
                 self.pc + @as(u16, @intCast(offset));
 
