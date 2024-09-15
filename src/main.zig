@@ -67,7 +67,7 @@ pub fn main() !void {
     const upscaled_output_display = raylib.Rectangle{ .x = 0, .y = 0, .width = display_w * 3, .height = display_h * 3 };
     const output_img = raylib.GenImageColor(display_w, display_h, raylib.BLACK);
     defer raylib.UnloadImage(output_img);
-    var output_texture = raylib.LoadTextureFromImage(output_img);
+    const output_texture = raylib.LoadTextureFromImage(output_img);
     defer raylib.UnloadTexture(output_texture);
     raylib.SetTextureFilter(output_texture, raylib.TEXTURE_FILTER_BILINEAR);
     var output_buffer: [display_w * display_h]raylib.Color = [_]raylib.Color{raylib.BLACK} ** (display_w * display_h);
@@ -76,7 +76,7 @@ pub fn main() !void {
     const left_pattern_table_display = raylib.Rectangle{ .x = 0, .y = 0, .width = 128, .height = 128 };
     const left_pattern_table_img = raylib.GenImageColor(128, 128, raylib.RED);
     defer raylib.UnloadImage(left_pattern_table_img);
-    var left_pattern_table_texture = raylib.LoadTextureFromImage(left_pattern_table_img);
+    const left_pattern_table_texture = raylib.LoadTextureFromImage(left_pattern_table_img);
     defer raylib.UnloadTexture(left_pattern_table_texture);
     var left_pattern_table_buffer: [256 * 64]raylib.Color = [_]raylib.Color{raylib.BLUE} ** (256 * 64);
 
@@ -84,7 +84,7 @@ pub fn main() !void {
     const right_pattern_table_display = raylib.Rectangle{ .x = 0, .y = 0, .width = 128, .height = 128 };
     const right_pattern_table_img = raylib.GenImageColor(128, 128, raylib.BLACK);
     defer raylib.UnloadImage(right_pattern_table_img);
-    var right_pattern_table_tex = raylib.LoadTextureFromImage(right_pattern_table_img);
+    const right_pattern_table_tex = raylib.LoadTextureFromImage(right_pattern_table_img);
     defer raylib.UnloadTexture(right_pattern_table_tex);
     var right_pattern_table_buffer: [256 * 64]raylib.Color = [_]raylib.Color{raylib.GREEN} ** (256 * 64);
 
@@ -93,9 +93,9 @@ pub fn main() !void {
     const palette_display_h = 32;
     const palette_count = 8;
     const palettes_display: [palette_count]raylib.Rectangle = [_]raylib.Rectangle{raylib.Rectangle{ .x = 0, .y = 0, .width = palette_display_w, .height = palette_display_h }} ** palette_count;
-    var palettes_img: [palette_count]raylib.Image = .{};
-    var palette_textures: [palette_count]raylib.Texture2D = .{};
-    var palette_buffer: [palette_count][palette_display_w * palette_display_h]raylib.Color = .{[_]raylib.Color{raylib.BLACK} ** (palette_display_w * palette_display_h)} ** palette_count;
+    var palettes_img: [palette_count]raylib.Image = .{.{}} ** palette_count;
+    var palette_textures: [palette_count]raylib.Texture2D = .{.{}} ** palette_count;
+    const palette_buffer: [palette_count][palette_display_w * palette_display_h]raylib.Color = .{[_]raylib.Color{raylib.BLACK} ** (palette_display_w * palette_display_h)} ** palette_count;
 
     { // Create the palette images and textures
         var i: usize = 0;
@@ -416,7 +416,7 @@ const DrawTextOptions = struct {
 fn drawText(allocator: std.mem.Allocator, comptime fmt: []const u8, args: anytype, options: DrawTextOptions) !void {
     const buf = try std.fmt.allocPrintZ(allocator, fmt, args);
     defer allocator.free(buf);
-    var c_buf: [*c]const u8 = @ptrCast(buf); // Cast it to a C style pointer so raylib can use it
+    const c_buf: [*c]const u8 = @ptrCast(buf); // Cast it to a C style pointer so raylib can use it
     raylib.DrawText(c_buf, options.pos_x, options.pos_y, options.font_size, options.color);
 }
 

@@ -534,7 +534,7 @@ fn adc(self: *Cpu, address: u16) !void {
     const value = try self.read(address);
 
     const carry: u1 = if (self.status.carry) 1 else 0;
-    var sum: u16 = @as(u16, a) + @as(u16, value) + carry;
+    const sum: u16 = @as(u16, a) + @as(u16, value) + carry;
     const result: u8 = @truncate(sum);
 
     self.a = result;
@@ -550,7 +550,7 @@ fn sbc(self: *Cpu, address: u16) !void {
     // the same result as we get here.
 
     const a = self.a;
-    var value = try self.read(address);
+    const value = try self.read(address);
 
     // For this instruction, the carry flag is interpreted as a "not borrowed"
     // flag which is just the carry flag inverted. Typically when writing 6502,

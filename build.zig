@@ -1,5 +1,4 @@
 const std = @import("std");
-const raylib_build = @import("libs/raylib/src/build.zig");
 
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
@@ -16,21 +15,23 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    const raylib = raylib_build.addRaylib(b, target, optimize, .{});
-    const nestest_log = std.build.FileSource.relative("data/nestest.log");
+    const raylib = b.dependency("raylib", .{
+        .target = target,
+        .optimize = optimize,
+    });
 
     const exe = b.addExecutable(.{
         .name = "nes",
         // In this case the main source file is merely a path, however, in more
         // complicated build scripts, this could be a generated file.
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
 
-    exe.linkLibrary(raylib);
-    exe.addIncludePath(.{ .path = "libs/raylib/src" });
-    exe.addAnonymousModule("data/nestest.log", .{ .source_file = nestest_log });
+    exe.linkLibrary(raylib.artifact("raylib"));
+    exe.root_module.addAnonymousImport("data/nestest.log", .{ .root_source_file = b.path("data/nestest.log") });
+    exe.addIncludePath(b.path("data/nestest.log"));
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
@@ -63,14 +64,12 @@ pub fn build(b: *std.Build) void {
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.
     const unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
 
-    unit_tests.linkLibrary(raylib);
-    unit_tests.addIncludePath(.{ .path = "libs/raylib/src" });
-    unit_tests.addAnonymousModule("data/nestest.log", .{ .source_file = nestest_log });
+    unit_tests.linkLibrary(raylib.artifact("raylib"));
 
     const run_unit_tests = b.addRunArtifact(unit_tests);
 
