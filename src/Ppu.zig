@@ -526,19 +526,15 @@ fn read(self: *Ppu, address: u16) !u8 {
 
             // horizontal arrangement, vertically mirrored
             if (is_horizontal_arrangement) {
-                if (address >= 0x2000 and address <= 0x27FF) {
-                    return self.nametables[address & 0x07FF];
-                }
-
-                return self.nametables[address & 0x0FFF];
+                return self.nametables[address & 0x07FF];
             }
 
             // vertical arrangement, horizontally mirrored
             if (address >= 0x2000 and address <= 0x27FF) {
                 return self.nametables[address & 0x03FF];
+            } else {
+                return self.nametables[address & 0x07FF];
             }
-
-            return self.nametables[address & 0x07FF];
         } else {
             return PpuMemoryAccessError.MissingCartridge;
         }
@@ -566,12 +562,7 @@ fn write(self: *Ppu, address: u16, value: u8) !void {
 
             // horizontal arrangement, vertically mirrored
             if (is_horizontal_arrangement) {
-                if (address >= 0x2000 and address <= 0x27FF) {
-                    self.nametables[address & 0x07FF] = value;
-                    return;
-                }
-
-                self.nametables[address & 0x0FFF] = value;
+                self.nametables[address & 0x07FF] = value;
                 return;
             }
 
@@ -579,10 +570,10 @@ fn write(self: *Ppu, address: u16, value: u8) !void {
             if (address >= 0x2000 and address <= 0x27FF) {
                 self.nametables[address & 0x03FF] = value;
                 return;
+            } else {
+                self.nametables[address & 0x07FF] = value;
+                return;
             }
-
-            self.nametables[address & 0x07FF] = value;
-            return;
         } else {
             return PpuMemoryAccessError.MissingCartridge;
         }
