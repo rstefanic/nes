@@ -63,8 +63,6 @@ pub fn main() !void {
     // Output Display Texture Setup
     const display_w = 256;
     const display_h = 240;
-    const output_display = raylib.Rectangle{ .x = 0, .y = 0, .width = display_w, .height = display_h };
-    const upscaled_output_display = raylib.Rectangle{ .x = 0, .y = 0, .width = display_w * 3, .height = display_h * 3 };
     const output_img = raylib.GenImageColor(display_w, display_h, raylib.BLACK);
     defer raylib.UnloadImage(output_img);
     const output_texture = raylib.LoadTextureFromImage(output_img);
@@ -293,7 +291,7 @@ pub fn main() !void {
             raylib.UpdateTexture(output_texture, &output_buffer);
         }
 
-        raylib.DrawTexturePro(output_texture, output_display, upscaled_output_display, raylib.Vector2{ .x = -5, .y = -5 }, 0.0, raylib.WHITE);
+        raylib.DrawTextureEx(output_texture, raylib.Vector2{ .x = 0, .y = 0 }, 0.0, 3.0, raylib.WHITE);
         raylib.DrawTextureRec(left_pattern_table_texture, left_pattern_table_display, raylib.Vector2{ .x = 850, .y = 5 }, raylib.WHITE);
         raylib.DrawTextureRec(right_pattern_table_tex, right_pattern_table_display, raylib.Vector2{ .x = 1050, .y = 5 }, raylib.WHITE);
 
