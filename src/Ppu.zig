@@ -541,7 +541,15 @@ fn read(self: *Ppu, address: u16) !u8 {
     } else if (address >= 0x3F00 and address <= 0x3FFF) {
         // Addresses $3F20-$3FFF are mirrors of the first 32 bytes for our palette RAM. So take
         // the lower 5 bits of the address to index into the palette RAM and mimic the mirroring.
-        return self.palette_ram[address & 0x001F];
+        var pal_addr = address & 0x001F;
+
+        // Entry 0 of each palette is a mirror the backdrop color
+        // https://www.nesdev.org/wiki/PPU_palettes#Palette_RAM
+        if ((pal_addr % 4) == 0) {
+            pal_addr &= 0x000F;
+        }
+
+        return self.palette_ram[pal_addr];
     }
 
     std.debug.print("Invalid PPU read: 0x{x}\n", .{address});
@@ -578,7 +586,13 @@ fn write(self: *Ppu, address: u16, value: u8) !void {
             return PpuMemoryAccessError.MissingCartridge;
         }
     } else if (address >= 0x3F00 and address <= 0x3FFF) {
-        self.palette_ram[address & 0x001F] = value;
+        var pal_addr = address & 0x001F;
+
+        if ((pal_addr % 4) == 0) {
+            pal_addr &= 0x000F;
+        }
+
+        self.palette_ram[pal_addr] = value;
         return;
     }
 
