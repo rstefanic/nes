@@ -408,7 +408,7 @@ pub fn step(self: *Ppu) !void {
     }
 
     const is_visible_dot = (self.dots < visible_dots_per_scanline);
-    const is_visible_scanline = (self.scanlines > 0) and (self.scanlines < 240);
+    const is_visible_scanline = (self.scanlines > -1) and (self.scanlines < 240);
 
     if (is_visible_dot and is_visible_scanline) {
         var pixel: u8 = 0x00;
