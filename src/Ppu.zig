@@ -477,6 +477,12 @@ pub fn step(self: *Ppu) !void {
                         break :sprite;
                     }
 
+                    if (idx == 0) { // detect if sprite hit zero has occurred
+                        if (self.ppumask.show_background and !bg_transparent) {
+                            self.ppustatus.sprite_zero_hit = true;
+                        }
+                    }
+
                     if (!bg_transparent and sprite.attributes.priority) {
                         break :sprite;
                     }
