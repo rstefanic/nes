@@ -411,7 +411,8 @@ pub fn step(self: *Ppu) !void {
     const is_visible_scanline = (self.scanlines > -1) and (self.scanlines < 240);
 
     if (is_visible_dot and is_visible_scanline) {
-        var pixel: u8 = 0x00;
+        var pixel: u8 = (try self.getPaletteById(0))[0]; // use the backdrop pixel as a default
+        var bg_transparent = false;
 
         if (self.ppumask.show_background) {
             const shift_offset: u16 = @as(u16, 0x8000) >> @as(u4, @truncate(self.x));
@@ -419,14 +420,16 @@ pub fn step(self: *Ppu) !void {
             const tile_lo: u2 = if ((self.framedata.shift_registers.bg_ptrn_lsb & shift_offset) > 0) 1 else 0;
             const tile_hi: u2 = if ((self.framedata.shift_registers.bg_ptrn_msb & shift_offset) > 0) 2 else 0;
             const bg_pixel: u2 = tile_hi | tile_lo;
+            bg_transparent = bg_pixel == 0x00;
 
             const attrib_lo: u2 = if ((self.framedata.shift_registers.attrib_lsb & shift_offset) > 0) 1 else 0;
             const attrib_hi: u2 = if ((self.framedata.shift_registers.attrib_msb & shift_offset) > 0) 2 else 0;
             const palette_id: u2 = attrib_hi | attrib_lo;
             const palette = try self.getPaletteById(palette_id);
 
-            // Assume the pixel to be rendered is the background pixel
-            pixel = palette[bg_pixel];
+            if (!bg_transparent) {
+                pixel = palette[bg_pixel];
+            }
         }
 
         if (self.ppumask.show_sprites) {
