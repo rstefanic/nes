@@ -446,12 +446,6 @@ pub fn step(self: *Ppu) !void {
                 const y_diff = self.scanlines - sprite.y;
 
                 if (x_diff >= 0 and x_diff < 8) sprite: {
-                    // When priority is set, then that means the BG is in front
-                    // of the sprite So we do not have to compute the fg pixel
-                    if (sprite.attributes.priority) {
-                        break :sprite;
-                    }
-
                     const palette = try self.getPaletteById(@as(u8, sprite.attributes.palette) + 4); // +4 to access the FG palettes
 
                     var tile_addr: u16 = sprite.index;
@@ -477,9 +471,14 @@ pub fn step(self: *Ppu) !void {
                     const pixel_lo: u2 = if ((tile_lo & pixel_offset) > 0) 1 else 0;
                     const pixel_hi: u2 = if ((tile_hi & pixel_offset) > 0) 2 else 0;
                     const fg_pixel: u2 = pixel_hi | pixel_lo;
+                    const fg_transparent = fg_pixel == 0x00;
 
-                    if (fg_pixel == 0x00) { // Is this sprite pixel transparent?
-                        break :sprite; // Then use the background pixel
+                    if (fg_transparent) {
+                        break :sprite;
+                    }
+
+                    if (!bg_transparent and sprite.attributes.priority) {
+                        break :sprite;
                     }
 
                     pixel = palette[fg_pixel];
