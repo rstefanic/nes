@@ -251,7 +251,7 @@ pub fn step(self: *Ppu) !void {
     }
 
     // Visible Scanlines
-    else if (self.scanlines < 240) {
+    if (self.scanlines >= 0 and self.scanlines < 240) {
         if ((self.dots > 0 and self.dots <= 257) or (self.dots >= 321 and self.dots <= 336)) {
             // Update Shifters
             if (self.ppumask.show_background) {
@@ -369,8 +369,10 @@ pub fn step(self: *Ppu) !void {
                 self.framedata.nametable_entry = tile;
             }
         }
+    }
 
-        // Sprite evaluation for next scanline
+    // Sprite evaluation for next scanline
+    if (self.scanlines < 240) {
         if (self.dots == 340) {
             var count: u8 = 0;
             var idx: u8 = 0;
@@ -398,7 +400,7 @@ pub fn step(self: *Ppu) !void {
     }
 
     // Vertical blanking period
-    else if (self.scanlines == 241) {
+    if (self.scanlines == 241) {
         if (self.dots == 1) {
             self.ppustatus.vertical_blank = true;
             if (self.ppuctrl.v) {
