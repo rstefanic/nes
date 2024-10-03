@@ -166,6 +166,7 @@ pub inline fn readPpudata(self: *Ppu) !u8 {
 
 pub inline fn writePpuctrl(self: *Ppu, value: u8) void {
     self.ppuctrl = @bitCast(value);
+    self.temp_ppuaddr.nametable = self.ppuctrl.nametable_addr;
 }
 
 pub inline fn writePpumask(self: *Ppu, value: u8) void {
