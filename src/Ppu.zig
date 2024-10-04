@@ -410,7 +410,10 @@ pub fn step(self: *Ppu) !void {
         }
     }
 
-    const is_visible_dot = (self.dots < visible_dots_per_scanline);
+    // Dot 0 is an "idle" cycle and the data fetching for pixel data doesn't
+    // start until dot 1. Thus the visible dots are 1 through 256 (inclusive)
+    // since there are 256 horizontal pixels per frame.
+    const is_visible_dot = (self.dots > 0 and self.dots <= visible_dots_per_scanline);
     const is_visible_scanline = (self.scanlines > -1) and (self.scanlines < 240);
 
     if (is_visible_dot and is_visible_scanline) {
@@ -445,7 +448,7 @@ pub fn step(self: *Ppu) !void {
             while (i > 0) : (i -= 1) {
                 const idx = self.scanline_sprites.sprites[i - 1];
                 const sprite = self.oam[idx];
-                const x_diff = self.dots - sprite.x;
+                const x_diff = self.dots - sprite.x - 1; // subtract one to compensate for dot 1 being the first visible dot
                 const y_diff = self.scanlines - sprite.y;
 
                 if (x_diff >= 0 and x_diff < 8) sprite: {
@@ -495,7 +498,8 @@ pub fn step(self: *Ppu) !void {
             }
         }
 
-        const x: usize = @intCast(self.dots);
+        // Subtract 1 from the dots since the visible dots start at 1 and the buffer is zero-based
+        const x: usize = @intCast(self.dots - 1);
         const y: usize = @as(usize, @intCast(self.scanlines)) << 8;
         self.buffer[x + y] = pixel;
     }
