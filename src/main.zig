@@ -32,6 +32,13 @@ pub fn main() !void {
         var gpa = std.heap.GeneralPurposeAllocator(.{}){};
         const cartridge_filename = args[1];
         cartridge = try Cartridge.init(gpa.allocator(), cartridge_filename);
+
+        if (cartridge.?.header.mapperNumber() != 0) {
+            std.debug.print("ROM must be mapper 0\n", .{});
+            cartridge.?.deinit();
+            return;
+        }
+
         console.connectCartridge(&cartridge.?);
     }
     std.process.argsFree(allocator, args);

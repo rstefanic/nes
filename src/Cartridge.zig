@@ -50,6 +50,11 @@ const Header = struct {
             .flag15 = mem[15],
         };
     }
+
+    pub fn mapperNumber(self: *Header) u8 {
+        return (@as(u8, self.flag7.upper_mapper_number) << 4) |
+            self.flag6.lower_mapper_number;
+    }
 };
 
 allocator: Allocator,
