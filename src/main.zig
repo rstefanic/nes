@@ -15,6 +15,20 @@ const WINDOW_WIDTH = 1280;
 const WINDOW_HEIGHT = 768;
 const TIME_PER_FRAME = 1.0 / 60.0;
 
+const DISPLAY_WIDTH = 256;
+const DISPLAY_HEIGHT = 240;
+
+const Display = struct {
+    // The output is where the PPU frame is rendered. It's made up of a texture
+    // which lives in the GPU memory while the buffer contains the raw pixel
+    // data. The PPU's palette colors are translated into raylib colors before
+    // the data is copied from the buffer to the texture on each frame.
+    output: struct {
+        texture: raylib.Texture2D,
+        buffer: [DISPLAY_WIDTH * DISPLAY_HEIGHT]raylib.Color,
+    },
+};
+
 pub fn main() !void {
     var buffer: [1000]u8 = undefined;
     var fba = std.heap.FixedBufferAllocator.init(&buffer);
@@ -83,14 +97,15 @@ pub fn main() !void {
     defer raylib.CloseWindow();
 
     // Output Display Texture Setup
-    const display_w = 256;
-    const display_h = 240;
-    const output_img = raylib.GenImageColor(display_w, display_h, raylib.BLACK);
-    defer raylib.UnloadImage(output_img);
-    const output_texture = raylib.LoadTextureFromImage(output_img);
-    defer raylib.UnloadTexture(output_texture);
-    raylib.SetTextureFilter(output_texture, raylib.TEXTURE_FILTER_BILINEAR);
-    var output_buffer: [display_w * display_h]raylib.Color = [_]raylib.Color{raylib.BLACK} ** (display_w * display_h);
+    var display: Display = undefined;
+
+    const image = raylib.GenImageColor(DISPLAY_WIDTH, DISPLAY_HEIGHT, raylib.BLACK);
+    display.output.texture = raylib.LoadTextureFromImage(image);
+    display.output.buffer = [_]raylib.Color{raylib.BLACK} ** (DISPLAY_WIDTH * DISPLAY_HEIGHT);
+    raylib.SetTextureFilter(display.output.texture, raylib.TEXTURE_FILTER_BILINEAR);
+
+    raylib.UnloadImage(image);
+    defer raylib.UnloadTexture(display.output.texture);
 
     // Left Pattern Table Texture Setup
     const left_pattern_table_display = raylib.Rectangle{ .x = 0, .y = 0, .width = 128, .height = 128 };
@@ -302,7 +317,7 @@ pub fn main() !void {
                 const pal_code = ppu.buffer[i];
                 const color = ppu.palette.colors[pal_code];
 
-                output_buffer[i] = raylib.Color{
+                display.output.buffer[i] = raylib.Color{
                     .r = color.r,
                     .g = color.g,
                     .b = color.b,
@@ -310,10 +325,10 @@ pub fn main() !void {
                 };
             }
 
-            raylib.UpdateTexture(output_texture, &output_buffer);
+            raylib.UpdateTexture(display.output.texture, &display.output.buffer);
         }
 
-        raylib.DrawTextureEx(output_texture, raylib.Vector2{ .x = 0, .y = 0 }, 0.0, 3.0, raylib.WHITE);
+        raylib.DrawTextureEx(display.output.texture, raylib.Vector2{ .x = 0, .y = 0 }, 0.0, 3.0, raylib.WHITE);
         raylib.DrawTextureRec(left_pattern_table_texture, left_pattern_table_display, raylib.Vector2{ .x = 850, .y = 5 }, raylib.WHITE);
         raylib.DrawTextureRec(right_pattern_table_tex, right_pattern_table_display, raylib.Vector2{ .x = 1050, .y = 5 }, raylib.WHITE);
 
