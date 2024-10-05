@@ -108,7 +108,6 @@ pub fn main() !void {
     defer raylib.UnloadTexture(display.output.texture);
 
     // Left Pattern Table Texture Setup
-    const left_pattern_table_display = raylib.Rectangle{ .x = 0, .y = 0, .width = 128, .height = 128 };
     const left_pattern_table_img = raylib.GenImageColor(128, 128, raylib.RED);
     defer raylib.UnloadImage(left_pattern_table_img);
     const left_pattern_table_texture = raylib.LoadTextureFromImage(left_pattern_table_img);
@@ -116,7 +115,6 @@ pub fn main() !void {
     var left_pattern_table_buffer: [256 * 64]raylib.Color = [_]raylib.Color{raylib.BLUE} ** (256 * 64);
 
     // Right Pattern Table Texture Setup
-    const right_pattern_table_display = raylib.Rectangle{ .x = 0, .y = 0, .width = 128, .height = 128 };
     const right_pattern_table_img = raylib.GenImageColor(128, 128, raylib.BLACK);
     defer raylib.UnloadImage(right_pattern_table_img);
     const right_pattern_table_tex = raylib.LoadTextureFromImage(right_pattern_table_img);
@@ -329,8 +327,8 @@ pub fn main() !void {
         }
 
         raylib.DrawTextureEx(display.output.texture, raylib.Vector2{ .x = 0, .y = 0 }, 0.0, 3.0, raylib.WHITE);
-        raylib.DrawTextureRec(left_pattern_table_texture, left_pattern_table_display, raylib.Vector2{ .x = 850, .y = 5 }, raylib.WHITE);
-        raylib.DrawTextureRec(right_pattern_table_tex, right_pattern_table_display, raylib.Vector2{ .x = 1050, .y = 5 }, raylib.WHITE);
+        raylib.DrawTexture(left_pattern_table_texture, 850, 5, raylib.WHITE);
+        raylib.DrawTexture(right_pattern_table_tex, 1050, 5, raylib.WHITE);
 
         {
             const bg_pal_column = 800;
