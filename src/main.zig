@@ -27,21 +27,35 @@ pub fn main() !void {
     var controller1 = Controller{ .console = &console };
     var controller2 = Controller{ .console = &console };
 
-    const args = try std.process.argsAlloc(allocator);
-    if (args.len > 1) { // Treat any arguments as a filepath to a ROM
-        var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-        const cartridge_filename = args[1];
-        cartridge = try Cartridge.init(gpa.allocator(), cartridge_filename);
+    // Program argument flags
+    var show_debug = false;
 
-        if (cartridge.?.header.mapperNumber() != 0) {
-            std.debug.print("ROM must be mapper 0\n", .{});
-            cartridge.?.deinit();
-            return;
+    // Parse program arguments
+    {
+        const args = try std.process.argsAlloc(allocator);
+        defer std.process.argsFree(allocator, args);
+
+        var i: usize = 1; // start at one to skip the program name
+        const max_args_count = 2;
+        while (i < args.len and i <= max_args_count) : (i += 1) {
+            const arg = args[i];
+            const debug_flag = "--d";
+
+            if (std.mem.eql(u8, arg, debug_flag)) {
+                show_debug = true;
+                continue;
+            }
+
+            // Treat the argument as the ROM filename to try and open it
+            var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+            cartridge = try Cartridge.init(gpa.allocator(), arg);
+            if (cartridge.?.header.mapperNumber() != 0) {
+                std.debug.print("ROM must be mapper 0\n", .{});
+                cartridge.?.deinit();
+                return;
+            }
         }
-
-        console.connectCartridge(&cartridge.?);
     }
-    std.process.argsFree(allocator, args);
 
     defer {
         if (cartridge) |_| {
@@ -51,6 +65,7 @@ pub fn main() !void {
 
     console.connectCpu(&cpu);
     console.connectPpu(&ppu);
+    console.connectCartridge(&cartridge.?);
     console.connectController1(&controller1);
     console.connectController2(&controller2);
     try ppu.setupPatternTables();
