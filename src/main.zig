@@ -11,8 +11,8 @@ const raylib = @cImport({
     @cInclude("raylib.h");
 });
 
-const WIDTH = 1280;
-const HEIGHT = 768;
+const WINDOW_WIDTH = 1280;
+const WINDOW_HEIGHT = 768;
 const TIME_PER_FRAME = 1.0 / 60.0;
 
 pub fn main() !void {
@@ -79,7 +79,7 @@ pub fn main() !void {
     _ = try neslog.next();
 
     raylib.SetTraceLogLevel(raylib.LOG_ERROR);
-    raylib.InitWindow(WIDTH, HEIGHT, "NES");
+    raylib.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "NES");
     defer raylib.CloseWindow();
 
     // Output Display Texture Setup
