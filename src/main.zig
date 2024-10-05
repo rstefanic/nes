@@ -18,6 +18,11 @@ const TIME_PER_FRAME = 1.0 / 60.0;
 const DISPLAY_WIDTH = 256;
 const DISPLAY_HEIGHT = 240;
 
+const PatternTableDisplay = struct {
+    texture: raylib.Texture2D,
+    buffer: [256 * 64]raylib.Color,
+};
+
 const Display = struct {
     // The output is where the PPU frame is rendered. It's made up of a texture
     // which lives in the GPU memory while the buffer contains the raw pixel
@@ -26,6 +31,13 @@ const Display = struct {
     output: struct {
         texture: raylib.Texture2D,
         buffer: [DISPLAY_WIDTH * DISPLAY_HEIGHT]raylib.Color,
+    },
+
+    debug: struct {
+        pattern_table: struct {
+            left: PatternTableDisplay,
+            right: PatternTableDisplay,
+        },
     },
 };
 
@@ -96,7 +108,7 @@ pub fn main() !void {
     raylib.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "NES");
     defer raylib.CloseWindow();
 
-    // Output Display Texture Setup
+    // Output Display Setup
     var display: Display = undefined;
 
     const image = raylib.GenImageColor(DISPLAY_WIDTH, DISPLAY_HEIGHT, raylib.BLACK);
@@ -107,19 +119,16 @@ pub fn main() !void {
     raylib.UnloadImage(image);
     defer raylib.UnloadTexture(display.output.texture);
 
-    // Left Pattern Table Texture Setup
-    const left_pattern_table_img = raylib.GenImageColor(128, 128, raylib.RED);
-    defer raylib.UnloadImage(left_pattern_table_img);
-    const left_pattern_table_texture = raylib.LoadTextureFromImage(left_pattern_table_img);
-    defer raylib.UnloadTexture(left_pattern_table_texture);
-    var left_pattern_table_buffer: [256 * 64]raylib.Color = [_]raylib.Color{raylib.BLUE} ** (256 * 64);
+    // Pattern Table Setup
+    const pattern_table_image = raylib.GenImageColor(128, 128, raylib.RED);
+    display.debug.pattern_table.left.texture = raylib.LoadTextureFromImage(pattern_table_image);
+    display.debug.pattern_table.left.buffer = [_]raylib.Color{raylib.BLUE} ** (256 * 64);
+    display.debug.pattern_table.right.texture = raylib.LoadTextureFromImage(pattern_table_image);
+    display.debug.pattern_table.right.buffer = [_]raylib.Color{raylib.BLUE} ** (256 * 64);
 
-    // Right Pattern Table Texture Setup
-    const right_pattern_table_img = raylib.GenImageColor(128, 128, raylib.BLACK);
-    defer raylib.UnloadImage(right_pattern_table_img);
-    const right_pattern_table_tex = raylib.LoadTextureFromImage(right_pattern_table_img);
-    defer raylib.UnloadTexture(right_pattern_table_tex);
-    var right_pattern_table_buffer: [256 * 64]raylib.Color = [_]raylib.Color{raylib.GREEN} ** (256 * 64);
+    raylib.UnloadImage(pattern_table_image);
+    defer raylib.UnloadTexture(display.debug.pattern_table.left.texture);
+    defer raylib.UnloadTexture(display.debug.pattern_table.right.texture);
 
     // Palette Viewer
     const palette_display_w = 128;
@@ -267,14 +276,14 @@ pub fn main() !void {
                             const buffer_row = (y + j) * pt_display_width;
                             const idx = buffer_column + buffer_row;
 
-                            left_pattern_table_buffer[idx] = left_pt_color;
-                            right_pattern_table_buffer[idx] = right_pt_color;
+                            display.debug.pattern_table.left.buffer[idx] = left_pt_color;
+                            display.debug.pattern_table.right.buffer[idx] = right_pt_color;
                         }
                     }
                 }
 
-                raylib.UpdateTexture(left_pattern_table_texture, &left_pattern_table_buffer);
-                raylib.UpdateTexture(right_pattern_table_tex, &right_pattern_table_buffer);
+                raylib.UpdateTexture(display.debug.pattern_table.left.texture, &display.debug.pattern_table.left.buffer);
+                raylib.UpdateTexture(display.debug.pattern_table.right.texture, &display.debug.pattern_table.right.buffer);
             }
         }
 
@@ -327,8 +336,8 @@ pub fn main() !void {
         }
 
         raylib.DrawTextureEx(display.output.texture, raylib.Vector2{ .x = 0, .y = 0 }, 0.0, 3.0, raylib.WHITE);
-        raylib.DrawTexture(left_pattern_table_texture, 850, 5, raylib.WHITE);
-        raylib.DrawTexture(right_pattern_table_tex, 1050, 5, raylib.WHITE);
+        raylib.DrawTexture(display.debug.pattern_table.left.texture, 850, 5, raylib.WHITE);
+        raylib.DrawTexture(display.debug.pattern_table.right.texture, 1050, 5, raylib.WHITE);
 
         {
             const bg_pal_column = 800;
