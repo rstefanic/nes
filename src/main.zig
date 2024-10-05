@@ -134,7 +134,6 @@ pub fn main() !void {
     const palette_display_w = 128;
     const palette_display_h = 32;
     const palette_count = 8;
-    const palettes_display: [palette_count]raylib.Rectangle = [_]raylib.Rectangle{raylib.Rectangle{ .x = 0, .y = 0, .width = palette_display_w, .height = palette_display_h }} ** palette_count;
     var palettes_img: [palette_count]raylib.Image = .{.{}} ** palette_count;
     var palette_textures: [palette_count]raylib.Texture2D = .{.{}} ** palette_count;
     const palette_buffer: [palette_count][palette_display_w * palette_display_h]raylib.Color = .{[_]raylib.Color{raylib.BLACK} ** (palette_display_w * palette_display_h)} ** palette_count;
@@ -355,12 +354,12 @@ pub fn main() !void {
             options.pos_x = fg_pal_column;
             try drawText(allocator, "FG Palettes", .{}, options);
 
-            var x: f32 = bg_pal_column;
-            var y: f32 = y_start;
+            var x: c_int = bg_pal_column;
+            var y: c_int = y_start;
 
             var i: usize = 0;
             while (i < 8) : (i += 1) {
-                raylib.DrawTextureRec(palette_textures[i], palettes_display[i], raylib.Vector2{ .x = x, .y = y }, raylib.WHITE);
+                raylib.DrawTexture(palette_textures[i], x, y, raylib.WHITE);
 
                 // The palette buffer blocks are 32 pixels high.
                 // 6 pixels are added for spacing here
