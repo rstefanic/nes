@@ -323,24 +323,8 @@ pub fn main() !void {
             }
         }
 
-        { // Draw PPU Buffer
-            var i: usize = 0;
-            while (i < ppu.buffer.len) : (i += 1) {
-                const pal_code = ppu.buffer[i];
-                const color = ppu.palette.colors[pal_code];
+        drawOutput(&display, &ppu);
 
-                display.output.buffer[i] = raylib.Color{
-                    .r = color.r,
-                    .g = color.g,
-                    .b = color.b,
-                    .a = 255, // alpha
-                };
-            }
-
-            raylib.UpdateTexture(display.output.texture, &display.output.buffer);
-        }
-
-        raylib.DrawTextureEx(display.output.texture, raylib.Vector2{ .x = 0, .y = 0 }, 0.0, 3.0, raylib.WHITE);
         raylib.DrawTexture(display.debug.pattern_table.left.texture, 850, 5, raylib.WHITE);
         raylib.DrawTexture(display.debug.pattern_table.right.texture, 1050, 5, raylib.WHITE);
 
@@ -447,6 +431,24 @@ pub fn main() !void {
 
         raylib.DrawFPS(5, 735);
     }
+}
+
+fn drawOutput(display: *Display, ppu: *Ppu) void {
+    var i: usize = 0;
+    while (i < ppu.buffer.len) : (i += 1) {
+        const pal_code = ppu.buffer[i];
+        const color = ppu.palette.colors[pal_code];
+
+        display.output.buffer[i] = raylib.Color{
+            .r = color.r,
+            .g = color.g,
+            .b = color.b,
+            .a = 255, // alpha
+        };
+    }
+
+    raylib.UpdateTexture(display.output.texture, &display.output.buffer);
+    raylib.DrawTextureEx(display.output.texture, raylib.Vector2{ .x = 0, .y = 0 }, 0.0, 3.0, raylib.WHITE);
 }
 
 inline fn flagColor(state: bool) raylib.Color {
