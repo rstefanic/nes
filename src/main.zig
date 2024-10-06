@@ -196,6 +196,15 @@ pub fn main() !void {
             dt = raylib.GetTime() - start;
         }
 
+        drawOutput(&display, &ppu);
+        raylib.DrawFPS(5, 735);
+
+        if (mode == .Debug) {
+            try drawPatternTables(&display, &ppu);
+            try drawPalettes(&display, &ppu, allocator);
+            try printConsoleInfo(&console, allocator);
+        }
+
         if (raylib.IsFileDropped()) {
             const file = raylib.LoadDroppedFiles();
             defer raylib.UnloadDroppedFiles(file);
@@ -219,13 +228,6 @@ pub fn main() !void {
                 ppu.palette = Palette.init(@ptrCast(palette));
             }
         }
-
-        drawOutput(&display, &ppu);
-        try drawPatternTables(&display, &ppu);
-        try drawPalettes(&display, &ppu, allocator);
-        try printConsoleInfo(&console, allocator);
-
-        raylib.DrawFPS(5, 735);
     }
 }
 
