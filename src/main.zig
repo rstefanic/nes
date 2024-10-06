@@ -11,7 +11,8 @@ const raylib = @cImport({
     @cInclude("raylib.h");
 });
 
-const WINDOW_WIDTH = 1280;
+const REGULAR_WINDOW_WIDTH = 768;
+const DEBUG_WINDOW_WIDTH = 1280;
 const WINDOW_HEIGHT = 768;
 const TIME_PER_FRAME = 1.0 / 60.0;
 
@@ -113,7 +114,7 @@ pub fn main() !void {
     _ = try neslog.next();
 
     raylib.SetTraceLogLevel(raylib.LOG_ERROR);
-    raylib.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "NES");
+    raylib.InitWindow(if (mode == .Debug) DEBUG_WINDOW_WIDTH else REGULAR_WINDOW_WIDTH, WINDOW_HEIGHT, "NES");
     defer raylib.CloseWindow();
 
     // Output Display Setup
