@@ -220,78 +220,6 @@ pub fn main() !void {
             }
         }
 
-        // Build Left/Right Pattern Table Textures
-        build_pattern_tables: {
-            const palette = try ppu.getPaletteById(1);
-            const color1 = ppu.palette.colors[palette[0]];
-            const color2 = ppu.palette.colors[palette[1]];
-            const color3 = ppu.palette.colors[palette[2]];
-            const color4 = ppu.palette.colors[palette[3]];
-
-            const colors: [4]raylib.Color = [_]raylib.Color{
-                raylib.Color{ .r = color1.r, .g = color1.g, .b = color1.b, .a = 255 },
-                raylib.Color{ .r = color2.r, .g = color2.g, .b = color2.b, .a = 255 },
-                raylib.Color{ .r = color3.r, .g = color3.g, .b = color3.b, .a = 255 },
-                raylib.Color{ .r = color4.r, .g = color4.g, .b = color4.b, .a = 255 },
-            };
-
-            if (cartridge) |c| {
-                // If the CHR ROM bank is empty, then there's nothing to draw :(
-                if (c.chr_rom_bank.len == 0) {
-                    break :build_pattern_tables;
-                }
-
-                const tile_height = 8; // Each tile in the pattern table is made up of 8x8 pixels
-                const tile_width = 8;
-                const pt_display_width = 128; // This is the width of the pattern table texture
-                var x: u32 = 0; // x & y here are used to index into the left/right pattern table buffers
-                var y: u32 = 0;
-                var i: usize = 0; // Keeps track of which tile we're looking at in the pattern tables
-
-                // Add each tile from the left pattern table to the corresponding texture. Since the left and right pattern
-                // tables are the same size and they're built in the same way, we can build the right pattern table at
-                // the same time using the same indexes used to access the left pattern table's tiles and buffers.
-                while (i < ppu.left_pattern_table.len) : (i += 1) {
-                    if (i > 0) {
-                        // The pattern tables are made up of 16x16 tiles (where each tile is 8x8 pixels).
-                        // For every 16 tiles, we want to start drawing the tiles on the next "row".
-                        if ((i % 16) == 0) {
-                            y += 8;
-                            x = 0;
-                        } else {
-                            x += 8;
-                        }
-                    }
-
-                    var j: u32 = 0;
-
-                    // Go through this tile's pixels and add them to the pattern table buffers.
-                    while (j < tile_height) : (j += 1) { // Tile Row
-
-                        var k: u32 = 0;
-                        const tile_row = j * tile_height;
-                        while (k < tile_width) : (k += 1) { // Tile Column
-                            const left_pt_pixel = ppu.left_pattern_table[i][tile_row + k];
-                            const left_pt_color = colors[left_pt_pixel];
-
-                            const right_pt_pixel = ppu.right_pattern_table[i][tile_row + k];
-                            const right_pt_color = colors[right_pt_pixel];
-
-                            const buffer_column = x + k;
-                            const buffer_row = (y + j) * pt_display_width;
-                            const idx = buffer_column + buffer_row;
-
-                            display.debug.pattern_table.left.buffer[idx] = left_pt_color;
-                            display.debug.pattern_table.right.buffer[idx] = right_pt_color;
-                        }
-                    }
-                }
-
-                raylib.UpdateTexture(display.debug.pattern_table.left.texture, &display.debug.pattern_table.left.buffer);
-                raylib.UpdateTexture(display.debug.pattern_table.right.texture, &display.debug.pattern_table.right.buffer);
-            }
-        }
-
         { // Build BG and FG palettes for debugging
             var i: u8 = 0;
             while (i < PALETTE_COUNT) : (i += 1) {
@@ -324,9 +252,7 @@ pub fn main() !void {
         }
 
         drawOutput(&display, &ppu);
-
-        raylib.DrawTexture(display.debug.pattern_table.left.texture, 850, 5, raylib.WHITE);
-        raylib.DrawTexture(display.debug.pattern_table.right.texture, 1050, 5, raylib.WHITE);
+        try drawPatternTables(&display, &ppu);
 
         {
             const bg_pal_column = 800;
@@ -449,6 +375,72 @@ fn drawOutput(display: *Display, ppu: *Ppu) void {
 
     raylib.UpdateTexture(display.output.texture, &display.output.buffer);
     raylib.DrawTextureEx(display.output.texture, raylib.Vector2{ .x = 0, .y = 0 }, 0.0, 3.0, raylib.WHITE);
+}
+
+fn drawPatternTables(display: *Display, ppu: *Ppu) !void {
+    const palette = try ppu.getPaletteById(1);
+    const color1 = ppu.palette.colors[palette[0]];
+    const color2 = ppu.palette.colors[palette[1]];
+    const color3 = ppu.palette.colors[palette[2]];
+    const color4 = ppu.palette.colors[palette[3]];
+
+    const colors: [4]raylib.Color = [_]raylib.Color{
+        raylib.Color{ .r = color1.r, .g = color1.g, .b = color1.b, .a = 255 },
+        raylib.Color{ .r = color2.r, .g = color2.g, .b = color2.b, .a = 255 },
+        raylib.Color{ .r = color3.r, .g = color3.g, .b = color3.b, .a = 255 },
+        raylib.Color{ .r = color4.r, .g = color4.g, .b = color4.b, .a = 255 },
+    };
+
+    const tile_height = 8; // Each tile in the pattern table is made up of 8x8 pixels
+    const tile_width = 8;
+    const pt_display_width = 128; // This is the width of the pattern table texture
+    var x: u32 = 0; // x & y here are used to index into the left/right pattern table buffers
+    var y: u32 = 0;
+    var i: usize = 0; // Keeps track of which tile we're looking at in the pattern tables
+
+    // Add each tile from the left pattern table to the corresponding texture. Since the left and right pattern
+    // tables are the same size and they're built in the same way, we can build the right pattern table at
+    // the same time using the same indexes used to access the left pattern table's tiles and buffers.
+    while (i < ppu.left_pattern_table.len) : (i += 1) {
+        if (i > 0) {
+            // The pattern tables are made up of 16x16 tiles (where each tile is 8x8 pixels).
+            // For every 16 tiles, we want to start drawing the tiles on the next "row".
+            if ((i % 16) == 0) {
+                y += 8;
+                x = 0;
+            } else {
+                x += 8;
+            }
+        }
+
+        var j: u32 = 0;
+
+        // Go through this tile's pixels and add them to the pattern table buffers.
+        while (j < tile_height) : (j += 1) { // Tile Row
+
+            var k: u32 = 0;
+            const tile_row = j * tile_height;
+            while (k < tile_width) : (k += 1) { // Tile Column
+                const left_pt_pixel = ppu.left_pattern_table[i][tile_row + k];
+                const left_pt_color = colors[left_pt_pixel];
+
+                const right_pt_pixel = ppu.right_pattern_table[i][tile_row + k];
+                const right_pt_color = colors[right_pt_pixel];
+
+                const buffer_column = x + k;
+                const buffer_row = (y + j) * pt_display_width;
+                const idx = buffer_column + buffer_row;
+
+                display.debug.pattern_table.left.buffer[idx] = left_pt_color;
+                display.debug.pattern_table.right.buffer[idx] = right_pt_color;
+            }
+        }
+    }
+
+    raylib.UpdateTexture(display.debug.pattern_table.left.texture, &display.debug.pattern_table.left.buffer);
+    raylib.UpdateTexture(display.debug.pattern_table.right.texture, &display.debug.pattern_table.right.buffer);
+    raylib.DrawTexture(display.debug.pattern_table.left.texture, 850, 5, raylib.WHITE);
+    raylib.DrawTexture(display.debug.pattern_table.right.texture, 1050, 5, raylib.WHITE);
 }
 
 inline fn flagColor(state: bool) raylib.Color {
