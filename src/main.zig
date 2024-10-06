@@ -27,6 +27,8 @@ const PatternTableDisplay = struct {
     buffer: [256 * 64]raylib.Color,
 };
 
+var mode: enum { Debug, Regular } = .Regular;
+
 const Display = struct {
     // The output is where the PPU frame is rendered. It's made up of a texture
     // which lives in the GPU memory while the buffer contains the raw pixel
@@ -62,9 +64,6 @@ pub fn main() !void {
     var controller1 = Controller{ .console = &console };
     var controller2 = Controller{ .console = &console };
 
-    // Program argument flags
-    var show_debug = false;
-
     // Parse program arguments
     {
         const args = try std.process.argsAlloc(allocator);
@@ -77,7 +76,7 @@ pub fn main() !void {
             const debug_flag = "--d";
 
             if (std.mem.eql(u8, arg, debug_flag)) {
-                show_debug = true;
+                mode = .Debug;
                 continue;
             }
 
