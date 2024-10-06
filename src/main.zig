@@ -220,73 +220,9 @@ pub fn main() !void {
             }
         }
 
-        { // Build BG and FG palettes for debugging
-            var i: u8 = 0;
-            while (i < PALETTE_COUNT) : (i += 1) {
-                const palette = try ppu.getPaletteById(i);
-                var buf = display.debug.palette.buffers[i];
-
-                var j: usize = 0;
-                while (j < 4) : (j += 1) { // There are 4 colors per palette
-                    const color = ppu.palette.colors[palette[j]];
-                    const offset = PALETTE_HEIGHT * j;
-
-                    // Each of the 4 colors that make up a palette will be displayed as 32x32 rectangles
-                    var k: usize = 0;
-                    while (k < 32) : (k += 1) {
-                        var l: usize = 0;
-                        while (l < 32) : (l += 1) {
-                            const idx = (offset + k) + (l * PALETTE_WIDTH);
-                            buf[idx] = raylib.Color{
-                                .r = color.r,
-                                .g = color.g,
-                                .b = color.b,
-                                .a = 255, // alpha
-                            };
-                        }
-                    }
-                }
-
-                raylib.UpdateTexture(display.debug.palette.textures[i], &buf);
-            }
-        }
-
         drawOutput(&display, &ppu);
         try drawPatternTables(&display, &ppu);
-
-        {
-            const bg_pal_column = 800;
-            const fg_pal_column = 1050;
-            const y_start = 500;
-            const y_padding = 38;
-
-            var options: DrawTextOptions = .{
-                .pos_x = bg_pal_column,
-                .pos_y = y_start - y_padding, // palettes start at `y_start`; add a label above it
-                .font_size = 24,
-            };
-
-            try drawText(allocator, "BG Palettes", .{}, options);
-            options.pos_x = fg_pal_column;
-            try drawText(allocator, "FG Palettes", .{}, options);
-
-            var x: c_int = bg_pal_column;
-            var y: c_int = y_start;
-
-            var i: usize = 0;
-            while (i < 8) : (i += 1) {
-                raylib.DrawTexture(display.debug.palette.textures[i], x, y, raylib.WHITE);
-
-                // The palette buffer blocks are 32 pixels high.
-                // 6 pixels are added for spacing here
-                y += y_padding;
-
-                if (@mod(i + 1, 4) == 0) {
-                    x = fg_pal_column;
-                    y = y_start; // reset y
-                }
-            }
-        }
+        try drawPalettes(&display, &ppu, allocator);
 
         // Screen Drawing
         const y_spacing = 42;
@@ -441,6 +377,75 @@ fn drawPatternTables(display: *Display, ppu: *Ppu) !void {
     raylib.UpdateTexture(display.debug.pattern_table.right.texture, &display.debug.pattern_table.right.buffer);
     raylib.DrawTexture(display.debug.pattern_table.left.texture, 850, 5, raylib.WHITE);
     raylib.DrawTexture(display.debug.pattern_table.right.texture, 1050, 5, raylib.WHITE);
+}
+
+fn drawPalettes(display: *Display, ppu: *Ppu, allocator: std.mem.Allocator) !void {
+    // Update palette textures
+    {
+        var i: u8 = 0;
+        while (i < PALETTE_COUNT) : (i += 1) {
+            const palette = try ppu.getPaletteById(i);
+            var buf = display.debug.palette.buffers[i];
+
+            var j: usize = 0;
+            while (j < 4) : (j += 1) { // There are 4 colors per palette
+                const color = ppu.palette.colors[palette[j]];
+                const offset = PALETTE_HEIGHT * j;
+
+                // Each of the 4 colors that make up a palette will be displayed as 32x32 rectangles
+                var k: usize = 0;
+                while (k < 32) : (k += 1) {
+                    var l: usize = 0;
+                    while (l < 32) : (l += 1) {
+                        const idx = (offset + k) + (l * PALETTE_WIDTH);
+                        buf[idx] = raylib.Color{
+                            .r = color.r,
+                            .g = color.g,
+                            .b = color.b,
+                            .a = 255, // alpha
+                        };
+                    }
+                }
+            }
+
+            raylib.UpdateTexture(display.debug.palette.textures[i], &buf);
+        }
+    }
+
+    // Draw palette textures
+    {
+        const bg_pal_column = 800;
+        const fg_pal_column = 1050;
+        const y_start = 500;
+        const y_padding = 38;
+
+        var options: DrawTextOptions = .{
+            .pos_x = bg_pal_column,
+            .pos_y = y_start - y_padding, // palettes start at `y_start`; add a label above it
+            .font_size = 24,
+        };
+
+        try drawText(allocator, "BG Palettes", .{}, options);
+        options.pos_x = fg_pal_column;
+        try drawText(allocator, "FG Palettes", .{}, options);
+
+        var x: c_int = bg_pal_column;
+        var y: c_int = y_start;
+
+        var i: usize = 0;
+        while (i < 8) : (i += 1) {
+            raylib.DrawTexture(display.debug.palette.textures[i], x, y, raylib.WHITE);
+
+            // The palette buffer blocks are 32 pixels high.
+            // 6 pixels are added for spacing here
+            y += y_padding;
+
+            if (@mod(i + 1, 4) == 0) {
+                x = fg_pal_column;
+                y = y_start; // reset y
+            }
+        }
+    }
 }
 
 inline fn flagColor(state: bool) raylib.Color {
