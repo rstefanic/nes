@@ -223,73 +223,7 @@ pub fn main() !void {
         drawOutput(&display, &ppu);
         try drawPatternTables(&display, &ppu);
         try drawPalettes(&display, &ppu, allocator);
-
-        // Screen Drawing
-        const y_spacing = 42;
-        var options: DrawTextOptions = .{
-            .pos_x = 800,
-            .pos_y = 150,
-            .font_size = 32,
-        };
-
-        // Draw CPU Information
-        try drawText(allocator, "cycles: {d}", .{console.cycles}, options);
-
-        options.pos_y += y_spacing;
-        try drawText(allocator, "a: 0x{x:0>2}", .{cpu.a}, options);
-
-        options.pos_y += y_spacing;
-        try drawText(allocator, "x: 0x{x:0>2}", .{cpu.x}, options);
-
-        options.pos_y += y_spacing;
-        try drawText(allocator, "y: 0x{x:0>2}", .{cpu.y}, options);
-
-        options.pos_y += y_spacing;
-        try drawText(allocator, "pc: 0x{x:0>4}", .{cpu.pc}, options);
-
-        options.pos_y += y_spacing;
-        try drawText(allocator, "sp: 0x{x:0>4}", .{cpu.sp}, options);
-
-        { // Status Registers
-            const sr_spacing: c_int = 24;
-            options.font_size = 28;
-            options.pos_y += y_spacing;
-            try drawText(allocator, "s:", .{}, options);
-
-            options.pos_x += sr_spacing * 2;
-            options.color = flagColor(cpu.status.negative_result);
-            try drawText(allocator, "N", .{}, options);
-
-            options.pos_x += sr_spacing;
-            options.color = flagColor(cpu.status.overflow);
-            try drawText(allocator, "V", .{}, options);
-
-            options.pos_x += sr_spacing;
-            options.color = raylib.GRAY;
-            try drawText(allocator, "-", .{}, options);
-
-            options.pos_x += sr_spacing;
-            options.color = raylib.GRAY;
-            try drawText(allocator, "-", .{}, options);
-
-            options.pos_x += sr_spacing;
-            options.color = flagColor(cpu.status.decimal_mode);
-            try drawText(allocator, "D", .{}, options);
-
-            options.pos_x += sr_spacing;
-            options.color = flagColor(cpu.status.interrupt_disable);
-            try drawText(allocator, "I", .{}, options);
-
-            options.pos_x += sr_spacing;
-            options.color = flagColor(cpu.status.zero_result);
-            try drawText(allocator, "Z", .{}, options);
-
-            options.pos_x += sr_spacing;
-            options.color = flagColor(cpu.status.carry);
-            try drawText(allocator, "C", .{}, options);
-
-            options.color = raylib.GRAY; // Reset color
-        }
+        try printConsoleInfo(&console, allocator);
 
         raylib.DrawFPS(5, 735);
     }
@@ -445,6 +379,77 @@ fn drawPalettes(display: *Display, ppu: *Ppu, allocator: std.mem.Allocator) !voi
                 y = y_start; // reset y
             }
         }
+    }
+}
+
+fn printConsoleInfo(console: *Console, allocator: std.mem.Allocator) !void {
+    const cpu = console.cpu.?;
+
+    // Screen Drawing
+    const y_spacing = 42;
+    var options: DrawTextOptions = .{
+        .pos_x = 800,
+        .pos_y = 150,
+        .font_size = 32,
+    };
+
+    // Draw CPU Information
+    try drawText(allocator, "cycles: {d}", .{console.cycles}, options);
+
+    options.pos_y += y_spacing;
+    try drawText(allocator, "a: 0x{x:0>2}", .{cpu.a}, options);
+
+    options.pos_y += y_spacing;
+    try drawText(allocator, "x: 0x{x:0>2}", .{cpu.x}, options);
+
+    options.pos_y += y_spacing;
+    try drawText(allocator, "y: 0x{x:0>2}", .{cpu.y}, options);
+
+    options.pos_y += y_spacing;
+    try drawText(allocator, "pc: 0x{x:0>4}", .{cpu.pc}, options);
+
+    options.pos_y += y_spacing;
+    try drawText(allocator, "sp: 0x{x:0>4}", .{cpu.sp}, options);
+
+    { // Status Registers
+        const sr_spacing: c_int = 24;
+        options.font_size = 28;
+        options.pos_y += y_spacing;
+        try drawText(allocator, "s:", .{}, options);
+
+        options.pos_x += sr_spacing * 2;
+        options.color = flagColor(cpu.status.negative_result);
+        try drawText(allocator, "N", .{}, options);
+
+        options.pos_x += sr_spacing;
+        options.color = flagColor(cpu.status.overflow);
+        try drawText(allocator, "V", .{}, options);
+
+        options.pos_x += sr_spacing;
+        options.color = raylib.GRAY;
+        try drawText(allocator, "-", .{}, options);
+
+        options.pos_x += sr_spacing;
+        options.color = raylib.GRAY;
+        try drawText(allocator, "-", .{}, options);
+
+        options.pos_x += sr_spacing;
+        options.color = flagColor(cpu.status.decimal_mode);
+        try drawText(allocator, "D", .{}, options);
+
+        options.pos_x += sr_spacing;
+        options.color = flagColor(cpu.status.interrupt_disable);
+        try drawText(allocator, "I", .{}, options);
+
+        options.pos_x += sr_spacing;
+        options.color = flagColor(cpu.status.zero_result);
+        try drawText(allocator, "Z", .{}, options);
+
+        options.pos_x += sr_spacing;
+        options.color = flagColor(cpu.status.carry);
+        try drawText(allocator, "C", .{}, options);
+
+        options.color = raylib.GRAY; // Reset color
     }
 }
 
