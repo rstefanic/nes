@@ -493,6 +493,10 @@ pub fn step(self: *Ppu) !void {
                         }
                     }
 
+                    if (!self.ppumask.show_leftmost_sprites and self.dots <= 8) {
+                        break :sprite;
+                    }
+
                     if (!bg_transparent and sprite.attributes.priority) {
                         break :sprite;
                     }
