@@ -117,9 +117,9 @@ pub fn main() !void {
     raylib.InitWindow(if (mode == .Debug) DEBUG_WINDOW_WIDTH else REGULAR_WINDOW_WIDTH, WINDOW_HEIGHT, "NES");
     defer raylib.CloseWindow();
 
-    // Output Display Setup
     var display: Display = undefined;
 
+    // Setup Output Display
     const image = raylib.GenImageColor(DISPLAY_WIDTH, DISPLAY_HEIGHT, raylib.BLACK);
     display.output.texture = raylib.LoadTextureFromImage(image);
     display.output.buffer = [_]raylib.Color{raylib.BLACK} ** (DISPLAY_WIDTH * DISPLAY_HEIGHT);
@@ -128,37 +128,43 @@ pub fn main() !void {
     raylib.UnloadImage(image);
     defer raylib.UnloadTexture(display.output.texture);
 
-    // Pattern Table Setup
-    const pattern_table_image = raylib.GenImageColor(128, 128, raylib.RED);
-    display.debug.pattern_table.left.texture = raylib.LoadTextureFromImage(pattern_table_image);
-    display.debug.pattern_table.left.buffer = [_]raylib.Color{raylib.BLUE} ** (256 * 64);
-    display.debug.pattern_table.right.texture = raylib.LoadTextureFromImage(pattern_table_image);
-    display.debug.pattern_table.right.buffer = [_]raylib.Color{raylib.BLUE} ** (256 * 64);
+    if (mode == .Debug) {
+        // Pattern Table Setup
+        const pattern_table_image = raylib.GenImageColor(128, 128, raylib.RED);
+        display.debug.pattern_table.left.texture = raylib.LoadTextureFromImage(pattern_table_image);
+        display.debug.pattern_table.left.buffer = [_]raylib.Color{raylib.BLUE} ** (256 * 64);
+        display.debug.pattern_table.right.texture = raylib.LoadTextureFromImage(pattern_table_image);
+        display.debug.pattern_table.right.buffer = [_]raylib.Color{raylib.BLUE} ** (256 * 64);
 
-    raylib.UnloadImage(pattern_table_image);
-    defer raylib.UnloadTexture(display.debug.pattern_table.left.texture);
-    defer raylib.UnloadTexture(display.debug.pattern_table.right.texture);
+        raylib.UnloadImage(pattern_table_image);
 
-    // Palette Setup
-    const palette_image = raylib.GenImageColor(PALETTE_WIDTH, PALETTE_HEIGHT, raylib.BLACK);
+        // Palette Setup
+        const palette_image = raylib.GenImageColor(PALETTE_WIDTH, PALETTE_HEIGHT, raylib.BLACK);
 
-    // Create the palette textures and buffers
-    {
-        var i: usize = 0;
-        while (i < PALETTE_COUNT) : (i += 1) {
-            display.debug.palette.textures[i] = raylib.LoadTextureFromImage(palette_image);
+        // Create the palette textures and buffers
+        {
+            var i: usize = 0;
+            while (i < PALETTE_COUNT) : (i += 1) {
+                display.debug.palette.textures[i] = raylib.LoadTextureFromImage(palette_image);
+            }
+
+            display.debug.palette.buffers = .{[_]raylib.Color{raylib.BLACK} ** (PALETTE_WIDTH * PALETTE_HEIGHT)} ** PALETTE_COUNT;
         }
 
-        display.debug.palette.buffers = .{[_]raylib.Color{raylib.BLACK} ** (PALETTE_WIDTH * PALETTE_HEIGHT)} ** PALETTE_COUNT;
+        raylib.UnloadImage(palette_image);
     }
 
-    raylib.UnloadImage(palette_image);
-
-    // Unload the allocated textures together at the end
     defer {
-        var i: usize = 0;
-        while (i < PALETTE_COUNT) : (i += 1) {
-            raylib.UnloadTexture(display.debug.palette.textures[i]);
+        if (mode == .Debug) {
+            // Unload the pattern table textures
+            raylib.UnloadTexture(display.debug.pattern_table.left.texture);
+            raylib.UnloadTexture(display.debug.pattern_table.right.texture);
+
+            // Unload the palette textures
+            var i: usize = 0;
+            while (i < PALETTE_COUNT) : (i += 1) {
+                raylib.UnloadTexture(display.debug.palette.textures[i]);
+            }
         }
     }
 
