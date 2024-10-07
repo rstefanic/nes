@@ -420,7 +420,7 @@ pub fn step(self: *Ppu) !void {
         var pixel: u8 = (try self.getPaletteById(0))[0]; // use the backdrop pixel as a default
         var bg_transparent = false;
 
-        if (self.ppumask.show_background) {
+        if (self.ppumask.show_background) background: {
             const shift_offset: u16 = @as(u16, 0x8000) >> @as(u4, @truncate(self.x));
 
             const tile_lo: u2 = if ((self.framedata.shift_registers.bg_ptrn_lsb & shift_offset) > 0) 1 else 0;
@@ -432,6 +432,10 @@ pub fn step(self: *Ppu) !void {
             const attrib_hi: u2 = if ((self.framedata.shift_registers.attrib_msb & shift_offset) > 0) 2 else 0;
             const palette_id: u2 = attrib_hi | attrib_lo;
             const palette = try self.getPaletteById(palette_id);
+
+            if (!self.ppumask.show_leftmost_background and self.dots <= 8) {
+                break :background;
+            }
 
             if (!bg_transparent) {
                 pixel = palette[bg_pixel];
