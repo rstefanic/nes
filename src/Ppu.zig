@@ -489,7 +489,14 @@ pub fn step(self: *Ppu) !void {
 
                     if (idx == 0) { // detect if sprite hit zero has occurred
                         if (self.ppumask.show_background and !bg_transparent) {
-                            self.ppustatus.sprite_zero_hit = true;
+                            // Account for the leftmost sprite and background flags from the PPUMASK. If both the leftmost
+                            // sprites and background are visible, then it's a hit. Otherwise, if one is hidden, then the
+                            // sprite hit zero can only occurs if we're right of the 8 leftmost pixels.
+                            if (self.ppumask.show_leftmost_sprites and self.ppumask.show_leftmost_background) {
+                                self.ppustatus.sprite_zero_hit = true;
+                            } else if (self.dots > 8) {
+                                self.ppustatus.sprite_zero_hit = true;
+                            }
                         }
                     }
 
