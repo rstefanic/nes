@@ -29,6 +29,7 @@ const PatternTableDisplay = struct {
 };
 
 var mode: enum { Debug, Regular } = .Regular;
+var break_mode: enum { On, Off } = .Off;
 
 const Display = struct {
     // The output is where the PPU frame is rendered. It's made up of a texture
@@ -173,6 +174,8 @@ pub fn main() !void {
         defer raylib.EndDrawing();
         raylib.ClearBackground(raylib.BLACK);
 
+        var step = false;
+
         { // User Input
             // Controller 1
             controller1.buttons.a = raylib.IsKeyDown(raylib.KEY_Z);
@@ -193,15 +196,27 @@ pub fn main() !void {
             controller2.buttons.down = raylib.IsKeyDown(raylib.KEY_KP_5);
             controller2.buttons.left = raylib.IsKeyDown(raylib.KEY_KP_4);
             controller2.buttons.right = raylib.IsKeyDown(raylib.KEY_KP_6);
+
+            if (raylib.IsKeyPressed(raylib.KEY_B)) {
+                break_mode = switch (break_mode) {
+                    .On => .Off,
+                    .Off => .On,
+                };
+                std.debug.print("break_mode: {any}\n", .{break_mode});
+            }
+
+            step = raylib.IsKeyPressed(raylib.KEY_S);
         }
 
         // Simulate enough of the Console to draw a frame every second
         const start = raylib.GetTime();
         var dt: f64 = 0;
-        while (dt < TIME_PER_FRAME) {
+        while (dt < TIME_PER_FRAME and ((break_mode == .On and step) or break_mode == .Off)) {
             try console.step();
             dt = raylib.GetTime() - start;
         }
+
+        step = false;
 
         drawOutput(&display, &ppu);
         raylib.DrawFPS(5, 735);
