@@ -255,8 +255,8 @@ pub fn main() !void {
 
 fn drawOutput(display: *Display, ppu: *Ppu) void {
     var i: usize = 0;
-    while (i < ppu.buffer.len) : (i += 1) {
-        const pal_code = ppu.buffer[i];
+    while (i < ppu.buffer.reader.*.len) : (i += 1) {
+        const pal_code = ppu.buffer.reader.*[i];
         const color = ppu.palette.colors[pal_code];
 
         display.output.buffer[i] = raylib.Color{

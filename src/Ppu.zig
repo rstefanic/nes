@@ -102,10 +102,18 @@ framedata: struct {
 
 palette: Palette = Palette.default(),
 
-// The display consists of 32x30 tiles, where each tile is 8x8 pixels.
-// Tiles can be further grouped into 2x2 groups called quadrants.
-// Quadrants can be further grouped into 2x2 groups called blocks.
-buffer: [256 * 240]u8 = [_]u8{0x2C} ** (256 * 240),
+// Double buffer used to prevent screen tearing. Writing occurs with the
+// `writer` pointer that contains an incomplete frame while `reader` is
+// a complete frame that's ready to be read.
+buffer: struct {
+    // The buffers are composed of 256x240 bytes where each byte is a pixel
+    one: [256 * 240]u8 = [_]u8{0x2C} ** (256 * 240),
+    two: [256 * 240]u8 = [_]u8{0x2C} ** (256 * 240),
+
+    // Pointers are swapped once the writer buffer has a complete frame
+    reader: *[256 * 240]u8 = undefined,
+    writer: *[256 * 240]u8 = undefined,
+} = .{},
 
 palette_ram: [32]u8 = [_]u8{0x00} ** 32,
 nametables: [0x800]u8 = std.mem.zeroes([0x800]u8),
@@ -125,6 +133,10 @@ pub fn reset(self: *Ppu) !void {
     // A CPU reset takes 7 cycles. Since the PPU runs 3 cycles
     // per CPU cycle, we'll set the dots here to 21 to mimic that.
     self.dots = 21;
+
+    // Start with buffer one as the writer
+    self.buffer.writer = &self.buffer.one;
+    self.buffer.reader = &self.buffer.two;
 }
 
 pub inline fn readPpustatus(self: *Ppu) u8 {
@@ -404,6 +416,15 @@ pub fn step(self: *Ppu) !void {
     if (self.scanlines == 241) {
         if (self.dots == 1) {
             self.ppustatus.vertical_blank = true;
+
+            if (self.buffer.reader == &self.buffer.one) {
+                self.buffer.reader = &self.buffer.two;
+                self.buffer.writer = &self.buffer.one;
+            } else {
+                self.buffer.reader = &self.buffer.one;
+                self.buffer.writer = &self.buffer.two;
+            }
+
             if (self.ppuctrl.v) {
                 try self.console.cpu.?.nmi();
             }
@@ -516,7 +537,7 @@ pub fn step(self: *Ppu) !void {
         // Subtract 1 from the dots since the visible dots start at 1 and the buffer is zero-based
         const x: usize = @intCast(self.dots - 1);
         const y: usize = @as(usize, @intCast(self.scanlines)) << 8;
-        self.buffer[x + y] = pixel;
+        self.buffer.writer.*[x + y] = pixel;
     }
 
     // Increment the dots and scanlines
