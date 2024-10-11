@@ -1,5 +1,6 @@
 const std = @import("std");
 
+const Apu = @import("Apu.zig");
 const Cartridge = @import("Cartridge.zig");
 const Console = @import("Console.zig");
 const Cpu = @import("Cpu.zig");
@@ -60,6 +61,7 @@ pub fn main() !void {
     const allocator = fba.allocator();
 
     var console = Console{};
+    var apu = Apu{ .console = &console };
     var cpu = Cpu{ .console = &console };
     var cartridge: ?Cartridge = null;
     var ppu = Ppu{ .console = &console };
@@ -99,6 +101,7 @@ pub fn main() !void {
         }
     }
 
+    console.connectApu(&apu);
     console.connectCpu(&cpu);
     console.connectPpu(&ppu);
     console.connectCartridge(&cartridge.?);
