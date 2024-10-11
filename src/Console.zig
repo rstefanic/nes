@@ -3,11 +3,13 @@ const Console = @This();
 const std = @import("std");
 const testing = std.testing;
 
+const Apu = @import("Apu.zig");
 const Cartridge = @import("Cartridge.zig");
 const Cpu = @import("Cpu.zig");
 const Ppu = @import("Ppu.zig");
 const Controller = @import("Controller.zig");
 
+apu: ?*Apu = null,
 cpu: ?*Cpu = null,
 cartridge: ?*Cartridge = null,
 ppu: ?*Ppu = null,
@@ -72,6 +74,10 @@ pub fn step(self: *Console) !void {
     try self.ppu.?.step();
 
     self.cycles += 1;
+}
+
+pub fn connectApu(self: *Console, apu: *Apu) void {
+    self.apu = apu;
 }
 
 pub fn connectCpu(self: *Console, cpu: *Cpu) void {
