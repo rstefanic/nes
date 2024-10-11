@@ -101,12 +101,13 @@ pub fn main() !void {
         }
     }
 
-    console.connectApu(&apu);
-    console.connectCpu(&cpu);
-    console.connectPpu(&ppu);
-    console.connectCartridge(&cartridge.?);
-    console.connectController1(&controller1);
-    console.connectController2(&controller2);
+    console.apu = &apu;
+    console.cpu = &cpu;
+    console.ppu = &ppu;
+    console.cartridge = &cartridge.?;
+    console.controller1 = &controller1;
+    console.controller2 = &controller2;
+
     try ppu.setupPatternTables();
     try cpu.reset();
     try ppu.reset();

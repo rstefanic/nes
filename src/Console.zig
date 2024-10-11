@@ -75,27 +75,3 @@ pub fn step(self: *Console) !void {
 
     self.cycles += 1;
 }
-
-pub fn connectApu(self: *Console, apu: *Apu) void {
-    self.apu = apu;
-}
-
-pub fn connectCpu(self: *Console, cpu: *Cpu) void {
-    self.cpu = cpu;
-}
-
-pub fn connectCartridge(self: *Console, cartridge: *Cartridge) void {
-    self.cartridge = cartridge;
-}
-
-pub fn connectPpu(self: *Console, ppu: *Ppu) void {
-    self.ppu = ppu;
-}
-
-pub fn connectController1(self: *Console, controller: *Controller) void {
-    self.controller1 = controller;
-}
-
-pub fn connectController2(self: *Console, controller: *Controller) void {
-    self.controller2 = controller;
-}
