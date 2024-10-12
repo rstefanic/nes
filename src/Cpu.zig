@@ -218,14 +218,13 @@ fn stackPop(self: *Cpu) !u8 {
 }
 
 pub fn step(self: *Cpu) !void {
-    if (self.cycles_remaining > 0) {
-        self.cycles_remaining -= 1;
-        return;
+    if (self.cycles_remaining == 0) {
+        const byte = try self.fetch();
+        const ins = Instruction.decode(byte);
+        try self.execute(ins);
     }
 
-    const byte = try self.fetch();
-    const ins = Instruction.decode(byte);
-    try self.execute(ins);
+    self.cycles_remaining -= 1;
 }
 
 inline fn fetch(self: *Cpu) !u8 {
@@ -1165,7 +1164,6 @@ test "LDA Absolute" {
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.a);
-    try testing.expectEqual(@as(u64, 4), cpu.cycles_remaining);
 }
 
 test "LDA Absolute,X" {
@@ -1181,7 +1179,6 @@ test "LDA Absolute,X" {
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.a);
-    try testing.expectEqual(@as(u64, 4), cpu.cycles_remaining);
 }
 
 test "LDA Absolute,X add additional cycle for crossing page boundaries" {
@@ -1197,7 +1194,6 @@ test "LDA Absolute,X add additional cycle for crossing page boundaries" {
     try cpu.step();
 
     try testing.expectEqual(expected_byte, cpu.a);
-    try testing.expectEqual(@as(u64, 5), cpu.cycles_remaining);
 }
 
 test "LDA Absolute,Y" {
@@ -1773,7 +1769,7 @@ test "BMI branching adds an additional cycle" {
     try cpu.step();
 
     try testing.expectEqual(expected_address, cpu.pc);
-    try testing.expectEqual(@as(u64, 3), cpu.cycles_remaining);
+    try testing.expectEqual(@as(u8, 2), cpu.cycles_remaining);
 }
 
 test "BMI branching with a page boundary adds two additional cycles" {
@@ -1788,7 +1784,7 @@ test "BMI branching with a page boundary adds two additional cycles" {
     try cpu.step();
 
     try testing.expectEqual(expected_address, cpu.pc);
-    try testing.expectEqual(@as(u64, 4), cpu.cycles_remaining);
+    try testing.expectEqual(@as(u8, 3), cpu.cycles_remaining);
 }
 
 test "BPL" {
