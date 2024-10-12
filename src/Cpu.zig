@@ -67,6 +67,7 @@ const CpuMemoryAccessError = error{
     InvalidMemoryAddress,
     InvalidPpuReadAddress,
     InvalidPpuWriteAddress,
+    InvalidApuWriteAddress,
     MissingCartridge,
 };
 
@@ -124,10 +125,49 @@ fn write(self: *Cpu, address: u16, value: u8) !void {
             }
         }
         return;
+    } else if (address >= 0x4000 and address <= 0x4013) {
+        if (self.console.apu) |apu| {
+            try switch (address) {
+                // Pulse 1 Channel
+                0x4000 => apu.pulse_one.envelope = @bitCast(value),
+                0x4001 => apu.pulse_one.sweep = @bitCast(value),
+                0x4002 => apu.pulse_one.timer_low = value,
+                0x4003 => apu.pulse_one.length_counter = @bitCast(value),
+
+                // Pulse 2 Channel
+                0x4004 => apu.pulse_two.envelope = @bitCast(value),
+                0x4005 => apu.pulse_two.sweep = @bitCast(value),
+                0x4006 => apu.pulse_two.timer_low = value,
+                0x4007 => apu.pulse_two.length_counter = @bitCast(value),
+
+                // Triangle Channel
+                0x4008 => apu.triangle.envelope = @bitCast(value),
+                0x400A => apu.triangle.timer_low = value,
+                0x400B => apu.triangle.length_counter = @bitCast(value),
+
+                // Noise Channel
+                0x400C => apu.noise.envelope = @bitCast(value),
+                0x400E => apu.noise.loop_noise = @bitCast(value),
+                0x400F => apu.noise.length_counter = @bitCast(value),
+
+                // DMC Channel
+                0x4010 => apu.dmc.control = @bitCast(value),
+                0x4011 => apu.dmc.load_counter = @truncate(value),
+                0x4012 => apu.dmc.sample_address = value,
+                0x4013 => apu.dmc.sample_length = value,
+
+                else => CpuMemoryAccessError.InvalidApuWriteAddress,
+            };
+        }
+
+        return;
     } else if (address == 0x4014) {
         self.console.dma.page = value;
         self.console.dma.addr = 0;
         self.console.dma.in_progress = true;
+        return;
+    } else if (address == 0x4015) {
+        self.console.apu.?.status = @bitCast(value);
         return;
     } else if (address == 0x4016) {
         if (self.console.controller1) |controller| {
