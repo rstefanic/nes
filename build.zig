@@ -30,7 +30,6 @@ pub fn build(b: *std.Build) void {
     });
 
     exe.linkLibrary(raylib.artifact("raylib"));
-    exe.root_module.addAnonymousImport("data/nestest.log", .{ .root_source_file = b.path("data/nestest.log") });
     exe.addIncludePath(b.path("data/nestest.log"));
 
     // This declares intent for the executable to be installed into the
@@ -70,6 +69,7 @@ pub fn build(b: *std.Build) void {
     });
 
     unit_tests.linkLibrary(raylib.artifact("raylib"));
+    unit_tests.root_module.addAnonymousImport("data/nestest.log", .{ .root_source_file = b.path("data/nestest.log") });
 
     const run_unit_tests = b.addRunArtifact(unit_tests);
 

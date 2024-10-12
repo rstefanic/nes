@@ -7,7 +7,6 @@ const Cpu = @import("Cpu.zig");
 const Palette = @import("Palette.zig");
 const Ppu = @import("Ppu.zig");
 const Controller = @import("Controller.zig");
-const NesLog = @import("NesLog.zig");
 const raylib = @cImport({
     @cInclude("raylib.h");
 });
@@ -111,12 +110,6 @@ pub fn main() !void {
     try ppu.setupPatternTables();
     try cpu.reset();
     try ppu.reset();
-
-    var neslog = NesLog.init();
-
-    // The first log entry is the expected start state of the CPU,
-    // which we know is valid. So this log entry is ignored.
-    _ = try neslog.next();
 
     raylib.SetTraceLogLevel(raylib.LOG_ERROR);
     raylib.InitWindow(if (mode == .Debug) DEBUG_WINDOW_WIDTH else REGULAR_WINDOW_WIDTH, WINDOW_HEIGHT, "NES");
@@ -500,5 +493,6 @@ fn drawText(allocator: std.mem.Allocator, comptime fmt: []const u8, args: anytyp
 }
 
 test {
+    _ = @import("NesLog.zig");
     std.testing.refAllDecls(@This());
 }
