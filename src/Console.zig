@@ -71,7 +71,9 @@ pub fn step(self: *Console) !void {
         }
     }
 
-    try self.ppu.?.step();
+    if (self.ppu) |ppu| {
+        try ppu.step();
+    }
 
     self.cycles += 1;
 }
