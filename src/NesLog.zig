@@ -15,13 +15,14 @@ const NesLogStep = struct {
     sp: u8,
     cycles: u64,
 
-    pub fn compare(self: NesLogStep, cpu: *Cpu) bool {
+    pub fn compare(self: NesLogStep, console: *Console) bool {
+        const cpu = console.cpu.?;
         return self.a == cpu.a //
         and self.x == cpu.x //
         and self.y == cpu.y //
         and self.p == @as(u8, @bitCast(cpu.status)) //
         and self.sp == cpu.sp //
-        and self.cycles == cpu.cycles;
+        and self.cycles == (console.cycles / 3);
     }
 };
 
@@ -91,19 +92,31 @@ test "The CPU output should match the NES Log" {
     var cartridge: Cartridge = try Cartridge.init(testing.allocator, &rom);
     defer cartridge.deinit();
 
-    console.connectCpu(&cpu);
-    console.connectCartridge(&cartridge);
+    console.cpu = &cpu;
+    console.cartridge = &cartridge;
     try cpu.reset();
 
     // The nestest rom starts at 0xC000, so we'll
     // override whatever was set during reset.
     cpu.pc = 0xC000;
 
-    _ = try neslog.next();
-    try cpu.step();
-
     while (try neslog.next()) |log| {
-        const same = log.compare(&cpu);
+        // Since the Console runs 3 times faster than the CPU, we'll clock
+        // the Console 3 times to simulate 1 CPU clock.
+        while (true) {
+            comptime var i = 0;
+            inline while (i < 3) : (i += 1) {
+                try console.step();
+            }
+
+            // Once the cycles_remaining is 0, we can compare the state of
+            // the CPU with the nestest.log.
+            if (cpu.cycles_remaining == 0) {
+                break;
+            }
+        }
+
+        const same = log.compare(&console);
         if (!same) { // Report an error and fail the test
             std.debug.print("\nNESLOG: Incorrect CPU state on line {d}\n", .{neslog.current_line_num});
             std.debug.print("\tLOG: A:{X} X:{X} Y:{X} P:{X} SP:{X} CYC:{d}\n", .{
@@ -120,13 +133,11 @@ test "The CPU output should match the NES Log" {
                 cpu.y,
                 @as(u8, @bitCast(cpu.status)),
                 cpu.sp,
-                cpu.cycles,
+                console.cycles / 3,
             });
 
             try testing.expect(false);
         }
-
-        try cpu.step();
     }
 
     try testing.expect(true); // Hooray! It's all good!
