@@ -392,8 +392,9 @@ pub fn step(self: *Ppu) !void {
             while (idx < 64) : (idx += 1) sprite_eval: {
                 const sprite = self.oam[idx];
 
-                // Add one to the diff since we're looking for sprites on the next scanline
-                const diff: i16 = self.scanlines - sprite.y + 1;
+                // Add one looking for sprites on the next scanline
+                // Add another one since sprite locations are one pixel below its 'y' coordinate.
+                const diff: i16 = self.scanlines - (sprite.y +% 1) + 1;
                 const sprite_height: usize = if (self.ppuctrl.h) 16 else 8;
 
                 if (diff >= 0 and diff < sprite_height) {
@@ -474,7 +475,7 @@ pub fn step(self: *Ppu) !void {
                 const idx = self.scanline_sprites.sprites[i - 1];
                 const sprite = self.oam[idx];
                 const x_diff = self.dots - sprite.x - 1; // subtract one to compensate for dot 1 being the first visible dot
-                const y_diff = self.scanlines - sprite.y;
+                const y_diff = self.scanlines - (sprite.y +% 1); // sprite locations are one pixel below its 'y' coordinate
 
                 if (x_diff >= 0 and x_diff < 8) sprite: {
                     const palette = try self.getPaletteById(@as(u8, sprite.attributes.palette) + 4); // +4 to access the FG palettes
