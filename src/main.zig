@@ -76,7 +76,7 @@ pub fn main() !void {
         const max_args_count = 2;
         while (i < args.len and i <= max_args_count) : (i += 1) {
             const arg = args[i];
-            const debug_flag = "--d";
+            const debug_flag = "--debug";
 
             if (std.mem.eql(u8, arg, debug_flag)) {
                 mode = .Debug;
