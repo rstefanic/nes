@@ -23,13 +23,20 @@ const PALETTE_WIDTH = 128;
 const PALETTE_HEIGHT = 32;
 const PALETTE_COUNT = 8;
 
-const PatternTableDisplay = struct {
-    texture: raylib.Texture2D,
-    buffer: [256 * 64]raylib.Color,
+const Tile = [64]u2;
+const PatternTable = struct {
+    left: [256]Tile = undefined,
+    right: [256]Tile = undefined,
 };
 
 var mode: enum { Debug, Regular } = .Regular;
 var break_mode: enum { On, Off } = .Off;
+var pattern_table = PatternTable{};
+
+const PatternTableDisplay = struct {
+    texture: raylib.Texture2D,
+    buffer: [256 * 64]raylib.Color,
+};
 
 const Display = struct {
     // The output is where the PPU frame is rendered. It's made up of a texture
@@ -107,7 +114,6 @@ pub fn main() !void {
     console.controller1 = &controller1;
     console.controller2 = &controller2;
 
-    try ppu.setupPatternTables();
     try cpu.reset();
     try ppu.reset();
 
@@ -127,6 +133,9 @@ pub fn main() !void {
     defer raylib.UnloadTexture(display.output.texture);
 
     if (mode == .Debug) {
+        try buildPatternTable(&pattern_table.left, cartridge.?.chr_rom_bank[0x0000..0x1000]);
+        try buildPatternTable(&pattern_table.right, cartridge.?.chr_rom_bank[0x1000..0x2000]);
+
         // Pattern Table Setup
         const pattern_table_image = raylib.GenImageColor(128, 128, raylib.RED);
         display.debug.pattern_table.left.texture = raylib.LoadTextureFromImage(pattern_table_image);
@@ -268,6 +277,33 @@ fn drawOutput(display: *Display, ppu: *Ppu) void {
     raylib.DrawTextureEx(display.output.texture, raylib.Vector2{ .x = 0, .y = 0 }, 0.0, 3.0, raylib.WHITE);
 }
 
+/// This is just for debugging purposes. In more complicated mappers,
+/// the pattern tables may change. For mapper 0, this will be fine
+/// since they only have a left and right pattern table and they
+/// never change.
+fn buildPatternTable(table: *[256]Tile, chr_rom: []u8) !void {
+    var tile_idx: u16 = 0;
+    while (tile_idx < table.len) : (tile_idx += 1) {
+        const chr_rom_offset = tile_idx * 16;
+
+        var tile_pixel_idx: u16 = 0;
+        while (tile_pixel_idx < 8) : (tile_pixel_idx += 1) {
+            const lo = chr_rom[chr_rom_offset + tile_pixel_idx];
+            const hi = chr_rom[chr_rom_offset + tile_pixel_idx + 8];
+            const tile_pixel_offset = tile_pixel_idx * 8;
+
+            table[tile_idx][0 + tile_pixel_offset] = @truncate((lo >> 7 & 1) + (hi >> 7 & 1));
+            table[tile_idx][1 + tile_pixel_offset] = @truncate((lo >> 6 & 1) + (hi >> 6 & 1));
+            table[tile_idx][2 + tile_pixel_offset] = @truncate((lo >> 5 & 1) + (hi >> 5 & 1));
+            table[tile_idx][3 + tile_pixel_offset] = @truncate((lo >> 4 & 1) + (hi >> 4 & 1));
+            table[tile_idx][4 + tile_pixel_offset] = @truncate((lo >> 3 & 1) + (hi >> 3 & 1));
+            table[tile_idx][5 + tile_pixel_offset] = @truncate((lo >> 2 & 1) + (hi >> 2 & 1));
+            table[tile_idx][6 + tile_pixel_offset] = @truncate((lo >> 1 & 1) + (hi >> 1 & 1));
+            table[tile_idx][7 + tile_pixel_offset] = @truncate((lo & 1) + (hi & 1));
+        }
+    }
+}
+
 fn drawPatternTables(display: *Display, ppu: *Ppu) !void {
     const palette = try ppu.getPaletteById(1);
     const color1 = ppu.palette.colors[palette[0]];
@@ -292,7 +328,7 @@ fn drawPatternTables(display: *Display, ppu: *Ppu) !void {
     // Add each tile from the left pattern table to the corresponding texture. Since the left and right pattern
     // tables are the same size and they're built in the same way, we can build the right pattern table at
     // the same time using the same indexes used to access the left pattern table's tiles and buffers.
-    while (i < ppu.left_pattern_table.len) : (i += 1) {
+    while (i < pattern_table.left.len) : (i += 1) {
         if (i > 0) {
             // The pattern tables are made up of 16x16 tiles (where each tile is 8x8 pixels).
             // For every 16 tiles, we want to start drawing the tiles on the next "row".
@@ -312,10 +348,10 @@ fn drawPatternTables(display: *Display, ppu: *Ppu) !void {
             var k: u32 = 0;
             const tile_row = j * tile_height;
             while (k < tile_width) : (k += 1) { // Tile Column
-                const left_pt_pixel = ppu.left_pattern_table[i][tile_row + k];
+                const left_pt_pixel = pattern_table.left[i][tile_row + k];
                 const left_pt_color = colors[left_pt_pixel];
 
-                const right_pt_pixel = ppu.right_pattern_table[i][tile_row + k];
+                const right_pt_pixel = pattern_table.right[i][tile_row + k];
                 const right_pt_color = colors[right_pt_pixel];
 
                 const buffer_column = x + k;

@@ -125,10 +125,6 @@ scanline_sprites: struct {
     count: u8 = 0,
 } = .{},
 
-// Pattern Tables define the raw image data
-left_pattern_table: [256]Tile = undefined,
-right_pattern_table: [256]Tile = undefined,
-
 pub fn reset(self: *Ppu) !void {
     // A CPU reset takes 7 cycles. Since the PPU runs 3 cycles
     // per CPU cycle, we'll set the dots here to 21 to mimic that.
@@ -650,36 +646,4 @@ fn write(self: *Ppu, address: u16, value: u8) !void {
 
     std.debug.print("Invalid PPU write: 0x{x}\n", .{address});
     return PpuMemoryAccessError.InvalidMemoryAddress;
-}
-
-/// This is just for debugging purposes. In more complicated mappers,
-/// the pattern tables may change. For mapper 0, this will be fine
-/// since they only have a left and right pattern table and they
-/// never change.
-pub fn setupPatternTables(self: *Ppu) !void {
-    try self.buildPatternTable(&self.left_pattern_table, 0x0000);
-    try self.buildPatternTable(&self.right_pattern_table, 0x1000);
-}
-
-fn buildPatternTable(self: *Ppu, table: *[256]Tile, chr_rom_offset_init: u16) !void {
-    var tile_idx: u16 = 0;
-    while (tile_idx < table.len) : (tile_idx += 1) {
-        const chr_rom_offset = chr_rom_offset_init + tile_idx * 16;
-
-        var tile_pixel_idx: u16 = 0;
-        while (tile_pixel_idx < 8) : (tile_pixel_idx += 1) {
-            const lo = try self.read(chr_rom_offset + tile_pixel_idx);
-            const hi = try self.read(chr_rom_offset + tile_pixel_idx + 8);
-            const tile_pixel_offset = tile_pixel_idx * 8;
-
-            table[tile_idx][0 + tile_pixel_offset] = @truncate((lo >> 7 & 1) + (hi >> 7 & 1));
-            table[tile_idx][1 + tile_pixel_offset] = @truncate((lo >> 6 & 1) + (hi >> 6 & 1));
-            table[tile_idx][2 + tile_pixel_offset] = @truncate((lo >> 5 & 1) + (hi >> 5 & 1));
-            table[tile_idx][3 + tile_pixel_offset] = @truncate((lo >> 4 & 1) + (hi >> 4 & 1));
-            table[tile_idx][4 + tile_pixel_offset] = @truncate((lo >> 3 & 1) + (hi >> 3 & 1));
-            table[tile_idx][5 + tile_pixel_offset] = @truncate((lo >> 2 & 1) + (hi >> 2 & 1));
-            table[tile_idx][6 + tile_pixel_offset] = @truncate((lo >> 1 & 1) + (hi >> 1 & 1));
-            table[tile_idx][7 + tile_pixel_offset] = @truncate((lo & 1) + (hi & 1));
-        }
-    }
 }
