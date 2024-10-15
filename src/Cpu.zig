@@ -85,6 +85,10 @@ pub fn read(self: *Cpu, address: u16) !u8 {
                 else => CpuMemoryAccessError.InvalidPpuReadAddress,
             };
         }
+    } else if (address == 0x4015) {
+        if (self.console.apu) |apu| {
+            return @bitCast(apu.status);
+        }
     } else if (address == 0x4016) {
         if (self.console.controller1) |controller| {
             return controller.read();
@@ -167,7 +171,9 @@ fn write(self: *Cpu, address: u16, value: u8) !void {
         self.console.dma.in_progress = true;
         return;
     } else if (address == 0x4015) {
-        self.console.apu.?.status = @bitCast(value);
+        if (self.console.apu) |apu| {
+            apu.status = @bitCast(value);
+        }
         return;
     } else if (address == 0x4016) {
         if (self.console.controller1) |controller| {
