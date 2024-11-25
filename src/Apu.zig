@@ -79,3 +79,17 @@ status: packed struct(u8) {
     enable_dmc: bool = false,
     _unused: u3 = 0,
 } = .{},
+
+pub fn step(self: *Apu) void {
+    if (self.status.enable_triangle) {
+        if (self.triangle.control) {
+            if (self.triangle.linear > 0) {
+                self.triangle.linear -= 1;
+            } else {
+                self.triangle.linear = self.triangle.linear_reload;
+            }
+        } else {
+            self.triangle.linear_reload = 0;
+        }
+    }
+}

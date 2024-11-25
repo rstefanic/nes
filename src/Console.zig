@@ -75,5 +75,11 @@ pub fn step(self: *Console) !void {
         try ppu.step();
     }
 
+    if (@mod(self.cycles, 3) == 0) {
+        if (self.apu) |apu| {
+            apu.step();
+        }
+    }
+
     self.cycles += 1;
 }
