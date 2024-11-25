@@ -145,9 +145,20 @@ fn write(self: *Cpu, address: u16, value: u8) !void {
                 0x4007 => apu.pulse_two.length_counter = @bitCast(value),
 
                 // Triangle Channel
-                0x4008 => apu.triangle.envelope = @bitCast(value),
-                0x400A => apu.triangle.timer_low = value,
-                0x400B => apu.triangle.length_counter = @bitCast(value),
+                0x4008 => {
+                    apu.triangle.control = if (((value >> 7) & 1) == 1) true else false;
+                    apu.triangle.linear_reload = @truncate(value);
+                },
+                0x400A => {
+                    const timer_msb = apu.triangle.timer & 0x700; // keep the 3 msb
+                    apu.triangle.timer = timer_msb + value;
+                },
+                0x400B => {
+                    const timer_lsb = (apu.triangle.timer & 0xFF); // keep the 8 lsb
+                    const timer_msb: u3 = @truncate(value); // the bottom 3 bits of the value make up the 3 msb of the timer
+                    apu.triangle.timer = (@as(u11, timer_msb) << 8) + timer_lsb;
+                    apu.triangle.length = @truncate(value >> 3);
+                },
 
                 // Noise Channel
                 0x400C => apu.noise.envelope = @bitCast(value),

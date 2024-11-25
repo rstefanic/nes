@@ -30,18 +30,16 @@ console: *Console,
 pulse_one: PulseChannel = .{},
 pulse_two: PulseChannel = .{},
 
-triangle: struct {
-    envelope: packed struct(u8) {
-        volume_envelope: u4 = 0,
-        constant_volume: bool = false,
-        envelope_loop: bool = false,
-        duty: u2 = 0,
-    } = .{},
-    timer_low: u8 = 0,
-    length_counter: packed struct(u8) {
-        timer_high: u3 = 0,
-        length_counter_load: u5 = 0,
-    } = .{},
+triangle: packed struct(u31) {
+    control: bool = false, // controls the linear counter reloading
+    linear: u7 = 0, // linear counter
+    linear_reload: u7 = 0,
+    timer: u11 = 0,
+    length: u5 = 0,
+
+    pub fn sequence(self: *@This()) f32 {
+        return 60 / (32 * (self.length + 1));
+    }
 } = .{},
 
 noise: struct {
